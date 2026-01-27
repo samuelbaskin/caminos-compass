@@ -6,7 +6,7 @@ function App() {
         padding: "40px",
         textAlign: "center",
         fontFamily: "Arial, sans-serif",
-        backgroundColor: "#CFCFCF" // darker gray background
+        backgroundColor: "#B8B8B8" // slightly darker gray
       }}
     >
       <div
