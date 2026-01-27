@@ -1,6 +1,15 @@
 function App() {
   return (
-    <div style={{ textAlign: "center", padding: "40px", fontFamily: "Arial" }}>
+    <div
+      style={{
+        minHeight: "100vh",
+        padding: "40px",
+        textAlign: "center",
+        fontFamily: "Arial",
+        background: "linear-gradient(135deg, #4B6FFF, #6EC6FF)",
+        color: "white"
+      }}
+    >
       <h1>IT7993 Project 19 Group 2</h1>
       <h2>Teaching Caminos Compass</h2>
 
