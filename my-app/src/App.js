@@ -6,17 +6,17 @@ function App() {
         padding: "40px",
         textAlign: "center",
         fontFamily: "Arial, sans-serif",
-        backgroundColor: "#F2F2F2" // pale gray
+        backgroundColor: "#CFCFCF" // darker gray background
       }}
     >
       <div
         style={{
-          backgroundColor: "#000000", // black box
+          backgroundColor: "#000000", // black content box
           padding: "40px",
           borderRadius: "12px",
           maxWidth: "700px",
           margin: "0 auto",
-          boxShadow: "0 4px 20px rgba(0,0,0,0.2)"
+          boxShadow: "0 4px 20px rgba(0,0,0,0.25)"
         }}
       >
         <h1 style={{ color: "#FFC61E", fontSize: "42px", marginBottom: "10px" }}>
