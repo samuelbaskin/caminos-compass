@@ -1,38 +1,249 @@
-.App {
-  text-align: center;
+:root{
+  --bg:#0b1220;
+  --panel:rgba(255,255,255,.06);
+  --border:rgba(255,255,255,.14);
+  --text:rgba(255,255,255,.92);
+  --muted:rgba(255,255,255,.72);
+  --radius:18px;
+  --shadow:0 10px 30px rgba(0,0,0,.25);
+  --container:1100px;
 }
 
-.App-logo {
-  height: 40vmin;
-  pointer-events: none;
+*{
+  box-sizing:border-box;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .App-logo {
-    animation: App-logo-spin infinite 20s linear;
+body{
+  margin:0;
+  background:
+    radial-gradient(900px 500px at 15% -10%, rgba(97,218,251,.20), transparent 60%),
+    radial-gradient(800px 500px at 95% 10%, rgba(167,139,250,.18), transparent 55%),
+    var(--bg);
+  color:var(--text);
+  font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;
+  line-height:1.55;
+}
+
+.container{
+  width:min(var(--container), calc(100% - 40px));
+  margin:0 auto;
+}
+
+.page{
+  padding-bottom:30px;
+}
+
+/* HERO SECTION */
+
+.hero{
+  padding:46px 0 22px;
+}
+
+.hero__inner{
+  display:grid;
+  grid-template-columns:1.2fr .8fr;
+  gap:18px;
+  align-items:stretch;
+}
+
+.eyebrow{
+  margin:0 0 10px;
+  color:var(--muted);
+  font-weight:700;
+  letter-spacing:.04em;
+  text-transform:uppercase;
+  font-size:.85rem;
+}
+
+.hero__title{
+  margin:0 0 10px;
+  font-size:clamp(2rem,3.2vw,3rem);
+  line-height:1.12;
+  letter-spacing:-.02em;
+}
+
+.hero__subtitle{
+  margin:0 0 16px;
+  color:var(--muted);
+  max-width:62ch;
+}
+
+.hero__actions{
+  display:flex;
+  gap:12px;
+  flex-wrap:wrap;
+  margin-bottom:14px;
+}
+
+/* BUTTONS */
+
+.btn{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  padding:10px 14px;
+  border-radius:14px;
+  border:1px solid rgba(97,218,251,.35);
+  background:rgba(255,255,255,.06);
+  color:var(--text);
+  font-weight:800;
+  text-decoration:none;
+  transition:0.2s ease;
+}
+
+.btn--ghost{
+  border:1px solid var(--border);
+  color:var(--muted);
+}
+
+.btn:hover{
+  transform:translateY(-1px);
+}
+
+/* TAG CHIPS */
+
+.chips{
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+}
+
+.chip{
+  padding:7px 10px;
+  border-radius:999px;
+  border:1px solid var(--border);
+  background:rgba(255,255,255,.05);
+  color:var(--muted);
+  font-weight:700;
+  font-size:.9rem;
+}
+
+/* SECTIONS */
+
+.section{
+  padding:34px 0;
+}
+
+.section--alt{
+  background:rgba(255,255,255,.02);
+  border-top:1px solid var(--border);
+  border-bottom:1px solid var(--border);
+}
+
+.section__title{
+  margin:0 0 8px;
+  font-size:1.6rem;
+  letter-spacing:-.01em;
+}
+
+.section__text{
+  margin:0 0 18px;
+  color:var(--muted);
+  max-width:85ch;
+}
+
+/* GRID SYSTEM */
+
+.grid{
+  display:grid;
+  gap:14px;
+}
+
+.grid--2{
+  grid-template-columns:repeat(2, minmax(0,1fr));
+}
+
+.grid--3{
+  grid-template-columns:repeat(3, minmax(0,1fr));
+}
+
+/* CARDS */
+
+.card{
+  background:var(--panel);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  padding:16px;
+  box-shadow:var(--shadow);
+}
+
+.card__title{
+  margin:0 0 8px;
+  font-size:1.1rem;
+}
+
+.card__text{
+  margin:0;
+  color:var(--muted);
+}
+
+.list{
+  margin:10px 0 0;
+  padding-left:18px;
+  color:var(--muted);
+}
+
+/* TEAM SECTION */
+
+.person{
+  display:flex;
+  gap:12px;
+  align-items:flex-start;
+}
+
+.avatar{
+  width:44px;
+  height:44px;
+  border-radius:16px;
+  display:grid;
+  place-items:center;
+  border:1px solid var(--border);
+  background:rgba(255,255,255,.06);
+  font-weight:900;
+}
+
+.person__name{
+  font-weight:900;
+}
+
+.person__role{
+  color:var(--muted);
+  font-weight:800;
+  margin-top:2px;
+}
+
+.person__desc{
+  color:rgba(255,255,255,.55);
+  margin-top:8px;
+  font-size:.95rem;
+}
+
+/* FOOTER */
+
+.footer{
+  margin-top:26px;
+}
+
+.footer__line{
+  height:1px;
+  background:var(--border);
+  margin-bottom:12px;
+}
+
+.footer__text{
+  color:rgba(255,255,255,.55);
+  margin:0;
+}
+
+/* RESPONSIVE */
+
+@media (max-width:920px){
+  .hero__inner{
+    grid-template-columns:1fr;
   }
-}
 
-.App-header {
-  background-color: #282c34;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  font-size: calc(10px + 2vmin);
-  color: white;
-}
-
-.App-link {
-  color: #61dafb;
-}
-
-@keyframes App-logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
+  .grid--3,
+  .grid--2{
+    grid-template-columns:1fr;
   }
 }
