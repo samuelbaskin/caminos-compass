@@ -1,38 +1,75 @@
+import "./App.css";
+
 function App() {
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        padding: "40px",
-        textAlign: "center",
-        fontFamily: "Arial, sans-serif",
-        backgroundColor: "#B8B8B8" // slightly darker gray
-      }}
-    >
-      <div
-        style={{
-          backgroundColor: "#000000", // black content box
-          padding: "40px",
-          borderRadius: "12px",
-          maxWidth: "700px",
-          margin: "0 auto",
-          boxShadow: "0 4px 20px rgba(0,0,0,0.25)"
-        }}
-      >
-        <h1 style={{ color: "#FFC61E", fontSize: "42px", marginBottom: "10px" }}>
-          IT7993 Project 19 Group 2
-        </h1>
+    <main className="page">
+      <section className="hero">
+        <div className="container hero__inner">
+          <div>
+            <p className="eyebrow">IT7993 • Project 19 • Group 2</p>
 
-        <h2 style={{ color: "#FFFFFF", fontSize: "28px", marginBottom: "20px" }}>
-          Teaching Caminos Compass
-        </h2>
+            <h1 className="hero__title">Teaching Caminos Compass</h1>
 
-        <p style={{ color: "#FFC61E", fontSize: "18px", lineHeight: "1.6" }}>
-          A digital platform designed to support teachers of multilingual learners
-          through a structured, reflective 6‑Paso process.
-        </p>
-      </div>
-    </div>
+            <p className="hero__subtitle">
+              A digital platform designed to support teachers of multilingual learners
+              through a structured, reflective 6-Paso process.
+            </p>
+
+            <div className="hero__actions">
+              <a className="btn" href="#overview">Overview</a>
+              <a className="btn btn--ghost" href="#features">Features</a>
+            </div>
+
+            <div className="chips">
+              <span className="chip">6-Paso workflow</span>
+              <span className="chip">Multilingual learners</span>
+              <span className="chip">Reflection + evidence</span>
+            </div>
+          </div>
+
+          <div className="card">
+            <h2 className="card__title">Project Snapshot</h2>
+            <ul className="list">
+              <li><strong>Course:</strong> IT7993</li>
+              <li><strong>Team:</strong> Group 2</li>
+              <li><strong>Purpose:</strong> Teacher support tool</li>
+              <li><strong>Method:</strong> Structured 6-Paso reflection</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section className="section" id="overview">
+        <div className="container">
+          <h2 className="section__title">Overview</h2>
+          <p className="section__text">
+            Add your required project details here (problem, users, goals, what gets saved to the backend).
+          </p>
+        </div>
+      </section>
+
+      <section className="section section--alt" id="features">
+        <div className="container">
+          <h2 className="section__title">Key Features</h2>
+
+          <div className="grid grid--2">
+            <div className="card">
+              <h3 className="card__title">Guided prompts</h3>
+              <p className="card__text">
+                Prompts for each Paso to keep reflection consistent.
+              </p>
+            </div>
+
+            <div className="card">
+              <h3 className="card__title">Backend saving</h3>
+              <p className="card__text">
+                Entries persist so teachers can review growth over time.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
   );
 }
 
