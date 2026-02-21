@@ -8,7 +8,7 @@ function App() {
           <div>
             <p className="eyebrow">IT7993 • Project 19 • Group 2</p>
 
-            <h1 className="hero__title">Teaching Caminos Compass</h1>
+            <h1 className="hero__title">Teaching Coaching Caminos</h1>
 
             <p className="hero__subtitle">
               A digital platform designed to support teachers of multilingual learners
