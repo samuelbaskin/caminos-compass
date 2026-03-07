@@ -37,10 +37,17 @@ app.use(express.json({ limit: "10mb" }));
 const MONGO_URI = process.env.MONGO_URI || "mongodb://localhost:27017/caminos-compass";
 let isConnected = false;
 async function connectDB() {
-  if (isConnected) return;
-  await mongoose.connect(MONGO_URI);
-  isConnected = true;
-  console.log("Connected to MongoDB:", MONGO_URI);
+  if (isConnected && mongoose.connection.readyState === 1) return;
+  isConnected = false;
+  try {
+    await mongoose.connect(MONGO_URI);
+    isConnected = true;
+    console.log("Connected to MongoDB");
+  } catch (err) {
+    isConnected = false;
+    console.error("MongoDB connection error:", err.message);
+    throw err;
+  }
 }
 
 if (process.env.VERCEL) {
@@ -66,8 +73,27 @@ app.use("/api/coaches", requireAuth, requireRole(["coach", "admin"]), coachRoute
 // Admin routes
 app.use("/api/admin", requireAuth, requireRole(["admin"]), adminRoutes);
 
-// Health check
-app.get("/api/health", (_req, res) => res.json({ status: "ok" }));
+// Health / diagnostics
+app.get("/api/health", async (_req, res) => {
+  const mongoState = mongoose.connection.readyState;
+  const states = { 0: "disconnected", 1: "connected", 2: "connecting", 3: "disconnecting" };
+  res.json({
+    status: mongoState === 1 ? "ok" : "degraded",
+    mongo: states[mongoState] || "unknown",
+    env: {
+      MONGO_URI: process.env.MONGO_URI ? "set (" + process.env.MONGO_URI.substring(0, 20) + "...)" : "NOT SET",
+      JWT_SECRET: process.env.JWT_SECRET ? "set" : "NOT SET",
+      GEMINI_API_KEY: process.env.GEMINI_API_KEY ? "set" : "NOT SET",
+      VERCEL: process.env.VERCEL || "not set",
+    },
+  });
+});
+
+// Global JSON error handler (prevents Express from returning HTML error pages)
+app.use((err, _req, res, _next) => {
+  console.error("Unhandled error:", err);
+  res.status(500).json({ message: err.message || "Internal server error." });
+});
 
 // ---------------------------------------------------------------------------
 // Server startup (local dev only; Vercel uses the export below)
