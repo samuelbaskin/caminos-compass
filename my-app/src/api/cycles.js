@@ -103,3 +103,11 @@ export async function updateLessonPlan(id, data) {
   });
   return handleRes(res);
 }
+
+export async function deleteLessonPlan(id) {
+  const res = await fetch(`${BASE_URL}/api/lesson-plans/${id}`, {
+    method: "DELETE",
+    headers: headers(),
+  });
+  return handleRes(res);
+}

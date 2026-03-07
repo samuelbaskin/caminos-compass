@@ -53,6 +53,18 @@ router.put("/:id", async (req, res) => {
   }
 });
 
+// DELETE /api/lesson-plans/:id — delete a lesson plan
+router.delete("/:id", async (req, res) => {
+  try {
+    const plan = await LessonPlan.findOneAndDelete({ _id: req.params.id, teacherId: req.user.userId });
+    if (!plan) return res.status(404).json({ message: "Lesson plan not found." });
+    res.json({ message: "Lesson plan deleted." });
+  } catch (err) {
+    console.error("Delete lesson plan error:", err);
+    res.status(500).json({ message: "Internal server error." });
+  }
+});
+
 // POST /api/lesson-plans/generate — generate lesson plan from Paso 1-5
 router.post("/generate", async (req, res) => {
   try {
@@ -78,18 +90,14 @@ router.post("/generate", async (req, res) => {
 
     const content = await generateLessonPlan(paso1to5Input);
 
-    const plan = await LessonPlan.findOneAndUpdate(
-      { teacherCycleId, teacherId: req.user.userId },
-      {
-        teacherCycleId,
-        teacherId: req.user.userId,
-        content,
-        paso1to5Input,
-        paso5Id: paso5?._id,
-        status: "generated",
-      },
-      { upsert: true, new: true }
-    );
+    const plan = await LessonPlan.create({
+      teacherCycleId,
+      teacherId: req.user.userId,
+      content,
+      paso1to5Input,
+      paso5Id: paso5?._id,
+      status: "generated",
+    });
 
     res.json({ lessonPlan: plan });
   } catch (err) {

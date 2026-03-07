@@ -12,6 +12,7 @@ import {
   listLessonPlans,
   getLessonPlan,
   updateLessonPlan,
+  deleteLessonPlan,
 } from "./api/cycles";
 
 const PASO_META = [
@@ -637,7 +638,7 @@ function mdToHtml(md) {
 
 /* ─── Lesson Plan View ───────────────────────────────────────────────── */
 
-function LessonPlanView({ plan, onRegenerate, generating, onSaveContent, onFinalize, onBackToList }) {
+function LessonPlanView({ plan, onRegenerate, generating, onSaveContent, onFinalize, onBackToList, onDelete }) {
   const [showInputs, setShowInputs] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editContent, setEditContent] = useState("");
@@ -750,6 +751,11 @@ function LessonPlanView({ plan, onRegenerate, generating, onSaveContent, onFinal
         {onFinalize && status !== "finalized" && !editing && (
           <button className="btn btn--resume" onClick={onFinalize}>
             Finalize Plan
+          </button>
+        )}
+        {onDelete && !editing && (
+          <button className="btn btn--ghost paso-btn--danger" onClick={() => onDelete(plan._id)}>
+            Delete Plan
           </button>
         )}
         {inputSummary && !editing && (
@@ -960,7 +966,7 @@ function DashboardHome({ user, cycle, pasoStatuses, onNavigate, savedPlans }) {
 
 /* ─── Plans List View ────────────────────────────────────────────────── */
 
-function PlansListView({ plans, onOpen, onGenerate, generating }) {
+function PlansListView({ plans, onOpen, onGenerate, generating, onDelete }) {
   return (
     <div className="lp-list-view">
       <div className="lp-list-view__header">
@@ -1001,6 +1007,14 @@ function PlansListView({ plans, onOpen, onGenerate, generating }) {
                   <span className="lp-list-item__date">
                     Created {created}{updated !== created ? ` · Updated ${updated}` : ""}
                   </span>
+                  {onDelete && (
+                    <button
+                      className="btn btn--ghost paso-btn--danger lp-list-item__delete"
+                      onClick={(e) => { e.stopPropagation(); onDelete(p._id); }}
+                    >
+                      Delete
+                    </button>
+                  )}
                 </div>
               </div>
             );
@@ -1198,6 +1212,22 @@ function TeacherDashboard({ user, onLogout }) {
     }
   }
 
+  async function handleDeletePlan(planId) {
+    if (!planId) return;
+    if (!window.confirm("Delete this lesson plan? This cannot be undone.")) return;
+    try {
+      await deleteLessonPlan(planId);
+      setSavedPlans((prev) => prev.filter((p) => p._id !== planId));
+      if (lessonPlan?._id === planId) {
+        setLessonPlan(null);
+        setView("plans");
+      }
+      setToast({ msg: "Lesson plan deleted.", type: "success" });
+    } catch (err) {
+      setToast({ msg: err.message, type: "error" });
+    }
+  }
+
   /* ── Navigation helper ─────────────────────────────────────────────── */
 
   function navigateTo(target) {
@@ -1278,6 +1308,7 @@ function TeacherDashboard({ user, onLogout }) {
             onOpen={(id) => navigateTo(`plan:${id}`)}
             onGenerate={canGenerate ? handleGenerate : null}
             generating={generating}
+            onDelete={handleDeletePlan}
           />
         </section>
       );
@@ -1293,6 +1324,7 @@ function TeacherDashboard({ user, onLogout }) {
             onSaveContent={handleSavePlanContent}
             onFinalize={handleFinalizePlan}
             onBackToList={() => navigateTo("plans")}
+            onDelete={handleDeletePlan}
           />
         </section>
       );
