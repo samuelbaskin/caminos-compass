@@ -568,17 +568,12 @@ function mdToHtml(md) {
   }
   function flushTable() {
     if (!inTable) return;
-    var tableString = '<div class="lp-table-wrap"><table class="lp-table"><thead><tr>';
     const hdr = tableRows[0] || [];
-    hdr.forEach((c) => { tableString += `<th>${inlineMd(c)}</th>`; });
-    tableString += "</tr></thead><tbody>";
-    for (let i = 2; i < tableRows.length; i++) {
-      tableString += "<tr>";
-      (tableRows[i] || []).forEach((c) => { tableString += `<td>${inlineMd(c)}</td>`; });
-      tableString += "</tr>";
-    }
-    tableString += "</tbody></table></div>";
-    out.push(tableString);
+    const headCells = hdr.map((c) => `<th>${inlineMd(c)}</th>`).join("");
+    const bodyRows = tableRows.slice(2).map((row) =>
+      "<tr>" + (row || []).map((c) => `<td>${inlineMd(c)}</td>`).join("") + "</tr>"
+    ).join("");
+    out.push(`<div class="lp-table-wrap"><table class="lp-table"><thead><tr>${headCells}</tr></thead><tbody>${bodyRows}</tbody></table></div>`);
     inTable = false;
     tableRows = [];
   }
