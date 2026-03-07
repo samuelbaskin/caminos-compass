@@ -39,17 +39,30 @@ let isConnected = false;
 async function connectDB() {
   if (isConnected && mongoose.connection.readyState === 1) return;
   isConnected = false;
-  try {
-    await mongoose.connect(MONGO_URI);
-    isConnected = true;
-    console.log("Connected to MongoDB");
-  } catch (err) {
-    isConnected = false;
-    console.error("MongoDB connection error:", err.message);
-    throw err;
-  }
+  await mongoose.connect(MONGO_URI, {
+    serverSelectionTimeoutMS: 5000,
+    connectTimeoutMS: 5000,
+  });
+  isConnected = true;
 }
 
+// Health / diagnostics — BEFORE db middleware so it always responds
+app.get("/api/health", (_req, res) => {
+  const mongoState = mongoose.connection.readyState;
+  const states = { 0: "disconnected", 1: "connected", 2: "connecting", 3: "disconnecting" };
+  res.json({
+    status: mongoState === 1 ? "ok" : "degraded",
+    mongo: states[mongoState] || "unknown",
+    env: {
+      MONGO_URI: process.env.MONGO_URI ? "set (" + process.env.MONGO_URI.substring(0, 20) + "...)" : "NOT SET",
+      JWT_SECRET: process.env.JWT_SECRET ? "set" : "NOT SET",
+      GEMINI_API_KEY: process.env.GEMINI_API_KEY ? "set" : "NOT SET",
+      VERCEL: process.env.VERCEL || "not set",
+    },
+  });
+});
+
+// DB connection middleware for serverless — runs AFTER health check
 if (process.env.VERCEL) {
   app.use(async (_req, _res, next) => {
     try { await connectDB(); } catch (err) { return next(err); }
@@ -72,22 +85,6 @@ app.use("/api/coaches", requireAuth, requireRole(["coach", "admin"]), coachRoute
 
 // Admin routes
 app.use("/api/admin", requireAuth, requireRole(["admin"]), adminRoutes);
-
-// Health / diagnostics
-app.get("/api/health", async (_req, res) => {
-  const mongoState = mongoose.connection.readyState;
-  const states = { 0: "disconnected", 1: "connected", 2: "connecting", 3: "disconnecting" };
-  res.json({
-    status: mongoState === 1 ? "ok" : "degraded",
-    mongo: states[mongoState] || "unknown",
-    env: {
-      MONGO_URI: process.env.MONGO_URI ? "set (" + process.env.MONGO_URI.substring(0, 20) + "...)" : "NOT SET",
-      JWT_SECRET: process.env.JWT_SECRET ? "set" : "NOT SET",
-      GEMINI_API_KEY: process.env.GEMINI_API_KEY ? "set" : "NOT SET",
-      VERCEL: process.env.VERCEL || "not set",
-    },
-  });
-});
 
 // Global JSON error handler (prevents Express from returning HTML error pages)
 app.use((err, _req, res, _next) => {
