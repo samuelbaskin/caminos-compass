@@ -100,9 +100,9 @@ app.use((err, _req, res, _next) => {
 // ---------------------------------------------------------------------------
 const PORT = process.env.PORT || 5000;
 
-if (process.env.VERCEL) {
-  module.exports = app;
-} else {
+module.exports = app;
+
+if (!process.env.VERCEL) {
   mongoose
     .connect(MONGO_URI)
     .then(() => {
