@@ -16,7 +16,7 @@ const VIEWS = {
 
 const TOOLS = [
   { name: "Teacher Efficacy Survey", icon: "☑" },
-  { name: "Student Profile", icon: "👤" },
+  { name: "Knowledge of Learner/Student Profile", icon: "👤" },
   { name: "AI Lesson Plan", icon: "💼" },
 ];
 
@@ -34,11 +34,41 @@ const RECENT_ACTIVITY = [
 ];
 
 const PASO1_FIELDS = [
-  { key: "positionality", label: "Positionality" },
-  { key: "assumptions", label: "Assumptions" },
-  { key: "relationshipToStudents", label: "Relationship to Students" },
-  { key: "awarenessOfBias", label: "Awareness of Bias" },
-  { key: "instructionalIntention", label: "Instructional Intention" },
+  { key: "q1_positionality", label: "1. Positionality in Relation to Content" },
+  { key: "q2_hiddenCurriculum", label: "2. The Hidden Curriculum" },
+  { key: "q3_explicitTeaching", label: "3. Explicit Teaching for All Students" },
+  { key: "q4_contentKnowledge", label: "4. Knowledge of Content" },
+  { key: "q5_learningProcess", label: "5. Your Learning Process" },
+  { key: "q6_studentRelationship", label: "6. Connection to Students and Culture" },
+  { key: "q7_diversityAffirmation", label: "7. Acknowledging Positionality and Celebrating Diversity" },
+  { key: "q8_learnerModeling", label: "8. Modeling as a Learner" },
+  { key: "q9_growthMindset", label: "9. Growth Mindset and Mistakes" },
+  { key: "q10_preparedness", label: "10. Preparation and Confidence" },
+];
+
+const PASO2_GENERAL_FIELDS = [
+  { key: "q1_studentReadiness", label: "1. Student Readiness" },
+  { key: "q2_priorKnowledge", label: "2. Prior Knowledge Assessment" },
+  { key: "q3_retentionCheck", label: "3. Retention of Prior Skills" },
+  { key: "q4_academicSkills", label: "4. Academic Skills" },
+  { key: "q5_skillPatterns", label: "5. Patterns in Academic Skills" },
+  { key: "q6_differentiation", label: "6. Differentiation Preparation" },
+  { key: "q7_languageProficiency", label: "7. Language Proficiency Support" },
+  { key: "q8_fundsOfKnowledge", label: "8. Funds of Knowledge" },
+  { key: "q9_familyDynamics", label: "9. Parents and Family Dynamics" },
+  { key: "q10_backgroundKnowledge", label: "10. Background Knowledge" },
+];
+
+const PASO3_GENERAL_FIELDS = [
+  { key: "q1_humanizingPedagogy", label: "1. Humanizing Pedagogy" },
+  { key: "q2_presentLearningObjective", label: "2. Presenting Learning Objective" },
+  { key: "q3_barriers", label: "3. Barriers" },
+  { key: "q4_accommodations", label: "4. Accommodations or Modifications" },
+  { key: "q5_resourcesMaterials", label: "5. Resources or Materials" },
+  { key: "q6_studentEngagement", label: "6. Student Engagement" },
+  { key: "q7_classroomEnvironment", label: "7. Physical Classroom Environment" },
+  { key: "q8_relateToLives", label: "8. Relating to Students' Lives" },
+  { key: "q9_backgroundKnowledge", label: "9. Background Knowledge or Skills" },
 ];
 
 const PASO3_FIELDS = [
@@ -50,12 +80,42 @@ const PASO3_FIELDS = [
   { key: "materialsResources", label: "Materials & Resources" },
 ];
 
+const PASO4_GENERAL_FIELDS = [
+  { key: "q1_equitableAccess", label: "1. Equitable Access to Learning" },
+  { key: "q2_supportingEnglishLearners", label: "2. Supporting English Learners" },
+  { key: "q3_homeLanguageSupport", label: "3. Home Language Support" },
+  { key: "q4_culturalRelevance", label: "4. Cultural Relevance" },
+  { key: "q5_engagementRepresentation", label: "5. Engagement, Representation, and Expression" },
+  { key: "q6_groupingForEquity", label: "6. Grouping for Equity" },
+  { key: "q7_essentialQuestionRelevance", label: "7. Essential Question Relevance" },
+];
+
 const PASO4_FIELDS = [
   { key: "districtStandards", label: "District Standards" },
   { key: "curriculumRequirements", label: "Curriculum Requirements" },
   { key: "assessmentGuidelines", label: "Assessment Guidelines" },
   { key: "accommodationPolicies", label: "Accommodation Policies" },
   { key: "additionalNotes", label: "Additional Notes" },
+];
+
+const PASO5_FIELDS = [
+  { key: "q1_partnerConnect", label: "1. Partner and connect with students" },
+  { key: "q2_greetStudents", label: "2. Greeting students" },
+  { key: "q3_comfortableParticipate", label: "3. Comfortable and eager to participate" },
+  { key: "q4_teamBuilding", label: "4. Team-building activities" },
+  { key: "q5_getToKnowStudents", label: "5. Get to know students' interests, culture, language, family" },
+  { key: "q6_topicRelevant", label: "6. Make topic interesting and relevant" },
+  { key: "q7_learningModalities", label: "7. Learning modalities" },
+  { key: "q8_activitiesToLearn", label: "8. Activities to learn about students" },
+];
+
+const PASO6_ADVOCACY_FIELDS = [
+  { key: "q1_advocateEquity", label: "1. Advocate for equity and social justice" },
+  { key: "q2_scaffolding", label: "2. Scaffolding student learning" },
+  { key: "q3_fitWithinUnit", label: "3. Fit within larger unit or learning goal" },
+  { key: "q4_assessmentData", label: "4. Assessment data that informed the lesson" },
+  { key: "q5_barriersChallenges", label: "5. Barriers or challenges and planning" },
+  { key: "q6_showLearningWays", label: "6. Opportunities to show learning in different ways" },
 ];
 
 function statusPill(status) {
@@ -322,7 +382,7 @@ function TeacherDetailView({ teacherId, onBack, onStartEval }) {
   if (error) return <ErrorBanner message={error} onRetry={load} />;
   if (!data) return null;
 
-  const { teacher, cycle, paso1, paso2, paso3, paso4, students, lessonPlan } = data;
+  const { teacher, cycle, paso1, paso2General, paso2, paso3General, paso3, paso4General, paso4, paso5, paso6, students, lessonPlan } = data;
 
   return (
     <div>
@@ -376,10 +436,27 @@ function TeacherDetailView({ teacherId, onBack, onStartEval }) {
             )}
           </section>
 
-          {/* PASO 2 */}
+          {/* PASO 2 — Section 1: General Questions */}
           <section className="coach-activity" style={{ padding: 20 }}>
             <h3 style={{ margin: "0 0 4px", fontSize: "1.05rem", fontWeight: 700, color: "var(--accent-hover)" }}>
-              Paso 2 — Student Profiles & Knowledge of Other
+              Paso 2 — Section 1: General Questions
+            </h3>
+            <div style={{ fontSize: ".8rem", color: "var(--muted)", marginBottom: 14 }}>
+              {paso2General ? <>{statusPill(paso2General.status)} <span style={{ marginLeft: 6 }}>Submitted {paso2General.updatedAt ? new Date(paso2General.updatedAt).toLocaleDateString() : ""}</span></> : "Not submitted"}
+            </div>
+            {paso2General ? (
+              PASO2_GENERAL_FIELDS.map((f) => (
+                <DataField key={f.key} label={f.label} value={paso2General[f.key]?.response} />
+              ))
+            ) : (
+              <p style={{ color: "var(--muted)", fontStyle: "italic" }}>No general questions data available.</p>
+            )}
+          </section>
+
+          {/* PASO 2 — Section 2: Student Profiles */}
+          <section className="coach-activity" style={{ padding: 20 }}>
+            <h3 style={{ margin: "0 0 4px", fontSize: "1.05rem", fontWeight: 700, color: "var(--accent-hover)" }}>
+              Paso 2 — Section 2: Student Profiles
             </h3>
             <div style={{ fontSize: ".8rem", color: "var(--muted)", marginBottom: 14 }}>
               {paso2 && paso2.length > 0 ? `${paso2.length} student profile(s)` : "No student profiles submitted"}
@@ -405,14 +482,31 @@ function TeacherDetailView({ teacherId, onBack, onStartEval }) {
                 );
               })
             ) : (
-              <p style={{ color: "var(--muted)", fontStyle: "italic" }}>No Paso 2 data available.</p>
+              <p style={{ color: "var(--muted)", fontStyle: "italic" }}>No student profile data available.</p>
             )}
           </section>
 
-          {/* PASO 3 */}
+          {/* PASO 3 — Section 1: General Questions */}
           <section className="coach-activity" style={{ padding: 20 }}>
             <h3 style={{ margin: "0 0 4px", fontSize: "1.05rem", fontWeight: 700, color: "var(--accent-hover)" }}>
-              Paso 3 — Lesson Plan Draft
+              Paso 3 — Section 1: General Questions
+            </h3>
+            <div style={{ fontSize: ".8rem", color: "var(--muted)", marginBottom: 14 }}>
+              {paso3General ? <>{statusPill(paso3General.status)} <span style={{ marginLeft: 6 }}>Submitted {paso3General.updatedAt ? new Date(paso3General.updatedAt).toLocaleDateString() : ""}</span></> : "Not submitted"}
+            </div>
+            {paso3General ? (
+              PASO3_GENERAL_FIELDS.map((f) => (
+                <DataField key={f.key} label={f.label} value={paso3General[f.key]?.response} />
+              ))
+            ) : (
+              <p style={{ color: "var(--muted)", fontStyle: "italic" }}>No general questions data available.</p>
+            )}
+          </section>
+
+          {/* PASO 3 — Section 2: Preliminary Lesson Plan */}
+          <section className="coach-activity" style={{ padding: 20 }}>
+            <h3 style={{ margin: "0 0 4px", fontSize: "1.05rem", fontWeight: 700, color: "var(--accent-hover)" }}>
+              Paso 3 — Section 2: Preliminary Lesson Plan
             </h3>
             <div style={{ fontSize: ".8rem", color: "var(--muted)", marginBottom: 14 }}>
               {paso3 ? <>{statusPill(paso3.status)} <span style={{ marginLeft: 6 }}>Submitted {paso3.updatedAt ? new Date(paso3.updatedAt).toLocaleDateString() : ""}</span></> : "Not submitted"}
@@ -422,14 +516,31 @@ function TeacherDetailView({ teacherId, onBack, onStartEval }) {
                 <DataField key={f.key} label={f.label} value={paso3[f.key]} />
               ))
             ) : (
-              <p style={{ color: "var(--muted)", fontStyle: "italic" }}>No Paso 3 data available.</p>
+              <p style={{ color: "var(--muted)", fontStyle: "italic" }}>No Paso 3 preliminary plan data available.</p>
             )}
           </section>
 
-          {/* PASO 4 */}
+          {/* PASO 4 — Section 1: General Questions */}
           <section className="coach-activity" style={{ padding: 20 }}>
             <h3 style={{ margin: "0 0 4px", fontSize: "1.05rem", fontWeight: 700, color: "var(--accent-hover)" }}>
-              Paso 4 — Institutional Context
+              Paso 4 — Section 1: General Questions
+            </h3>
+            <div style={{ fontSize: ".8rem", color: "var(--muted)", marginBottom: 14 }}>
+              {paso4General ? <>{statusPill(paso4General.status)} <span style={{ marginLeft: 6 }}>Submitted {paso4General.updatedAt ? new Date(paso4General.updatedAt).toLocaleDateString() : ""}</span></> : "Not submitted"}
+            </div>
+            {paso4General ? (
+              PASO4_GENERAL_FIELDS.map((f) => (
+                <DataField key={f.key} label={f.label} value={paso4General[f.key]?.response} />
+              ))
+            ) : (
+              <p style={{ color: "var(--muted)", fontStyle: "italic" }}>No general questions data available.</p>
+            )}
+          </section>
+
+          {/* PASO 4 — Section 2: District Guidelines */}
+          <section className="coach-activity" style={{ padding: 20 }}>
+            <h3 style={{ margin: "0 0 4px", fontSize: "1.05rem", fontWeight: 700, color: "var(--accent-hover)" }}>
+              Paso 4 — Section 2: District Guidelines
             </h3>
             <div style={{ fontSize: ".8rem", color: "var(--muted)", marginBottom: 14 }}>
               {paso4 ? <>{statusPill(paso4.status)} <span style={{ marginLeft: 6 }}>Submitted {paso4.updatedAt ? new Date(paso4.updatedAt).toLocaleDateString() : ""}</span></> : "Not submitted"}
@@ -439,7 +550,41 @@ function TeacherDetailView({ teacherId, onBack, onStartEval }) {
                 <DataField key={f.key} label={f.label} value={paso4[f.key]} />
               ))
             ) : (
-              <p style={{ color: "var(--muted)", fontStyle: "italic" }}>No Paso 4 data available.</p>
+              <p style={{ color: "var(--muted)", fontStyle: "italic" }}>No Paso 4 district guidelines data available.</p>
+            )}
+          </section>
+
+          {/* PASO 5 — Practice of Knowing Learners, Families & Communities */}
+          <section className="coach-activity" style={{ padding: 20 }}>
+            <h3 style={{ margin: "0 0 4px", fontSize: "1.05rem", fontWeight: 700, color: "var(--accent-hover)" }}>
+              Paso 5 — Practice of Knowing Learners, Families & Communities
+            </h3>
+            <div style={{ fontSize: ".8rem", color: "var(--muted)", marginBottom: 14 }}>
+              {paso5 ? <>{statusPill(paso5.status)} <span style={{ marginLeft: 6 }}>Submitted {paso5.updatedAt ? new Date(paso5.updatedAt).toLocaleDateString() : ""}</span></> : "Not submitted"}
+            </div>
+            {paso5 ? (
+              PASO5_FIELDS.map((f) => (
+                <DataField key={f.key} label={f.label} value={paso5[f.key]} />
+              ))
+            ) : (
+              <p style={{ color: "var(--muted)", fontStyle: "italic" }}>No Paso 5 data available.</p>
+            )}
+          </section>
+
+          {/* PASO 6 — Practice of Advocacy */}
+          <section className="coach-activity" style={{ padding: 20 }}>
+            <h3 style={{ margin: "0 0 4px", fontSize: "1.05rem", fontWeight: 700, color: "var(--accent-hover)" }}>
+              Paso 6 — Practice of Advocacy
+            </h3>
+            <div style={{ fontSize: ".8rem", color: "var(--muted)", marginBottom: 14 }}>
+              {paso6 ? <>{statusPill(paso6.status)} <span style={{ marginLeft: 6 }}>Submitted {paso6.updatedAt ? new Date(paso6.updatedAt).toLocaleDateString() : ""}</span></> : "Not submitted"}
+            </div>
+            {paso6 ? (
+              PASO6_ADVOCACY_FIELDS.map((f) => (
+                <DataField key={f.key} label={f.label} value={paso6[f.key]} />
+              ))
+            ) : (
+              <p style={{ color: "var(--muted)", fontStyle: "italic" }}>No Paso 6 data available.</p>
             )}
           </section>
 

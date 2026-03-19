@@ -20,11 +20,13 @@ const app = express();
 // ---------------------------------------------------------------------------
 const allowedOrigins = process.env.CLIENT_ORIGIN
   ? process.env.CLIENT_ORIGIN.split(",").map((s) => s.trim())
-  : ["http://localhost:3000"];
+  : [];
 
 app.use(cors({
   origin: (origin, cb) => {
-    if (!origin || allowedOrigins.includes(origin) || process.env.VERCEL) return cb(null, true);
+    if (!origin) return cb(null, true);
+    if (process.env.VERCEL || !process.env.NODE_ENV || process.env.NODE_ENV === "development") return cb(null, true);
+    if (allowedOrigins.includes(origin)) return cb(null, true);
     cb(new Error("CORS not allowed"));
   },
   credentials: true,

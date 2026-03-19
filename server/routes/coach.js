@@ -3,8 +3,13 @@ const User = require("../models/User");
 const TeacherCycle = require("../models/TeacherCycle");
 const Paso1Submission = require("../models/Paso1Submission");
 const Paso2Submission = require("../models/Paso2Submission");
+const Paso2GeneralSubmission = require("../models/Paso2GeneralSubmission");
 const Paso3Submission = require("../models/Paso3Submission");
+const Paso3GeneralSubmission = require("../models/Paso3GeneralSubmission");
 const Paso4Submission = require("../models/Paso4Submission");
+const Paso4GeneralSubmission = require("../models/Paso4GeneralSubmission");
+const Paso5Submission = require("../models/Paso5Submission");
+const Paso6Submission = require("../models/Paso6Submission");
 const Student = require("../models/Student");
 const LessonPlan = require("../models/LessonPlan");
 const CoachEvaluation = require("../models/CoachEvaluation");
@@ -44,10 +49,15 @@ router.get("/teachers/:teacherId", async (req, res) => {
     if (!latestCycle) return res.json({ teacher: teacher.toPublic(), cycle: null });
 
     const cid = latestCycle._id;
-    const [paso1, paso3, paso4, students, lessonPlan] = await Promise.all([
+    const [paso1, paso2General, paso3General, paso3, paso4General, paso4, paso5, paso6, students, lessonPlan] = await Promise.all([
       Paso1Submission.findOne({ teacherCycleId: cid }),
+      Paso2GeneralSubmission.findOne({ teacherCycleId: cid }),
+      Paso3GeneralSubmission.findOne({ teacherCycleId: cid }),
       Paso3Submission.findOne({ teacherCycleId: cid }),
+      Paso4GeneralSubmission.findOne({ teacherCycleId: cid }),
       Paso4Submission.findOne({ teacherCycleId: cid }),
+      Paso5Submission.findOne({ teacherCycleId: cid }),
+      Paso6Submission.findOne({ teacherCycleId: cid }),
       Student.find({ teacherCycleId: cid }),
       LessonPlan.findOne({ teacherCycleId: cid }),
     ]);
@@ -59,9 +69,14 @@ router.get("/teachers/:teacherId", async (req, res) => {
       teacher: teacher.toPublic(),
       cycle: latestCycle,
       paso1,
+      paso2General,
       paso2,
+      paso3General,
       paso3,
+      paso4General,
       paso4,
+      paso5,
+      paso6,
       students,
       lessonPlan,
       evaluations,
