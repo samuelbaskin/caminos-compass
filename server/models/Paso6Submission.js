@@ -21,7 +21,12 @@ const paso6Schema = new mongoose.Schema(
     equitableProgress: { type: Number, default: 0, min: 0, max: 100 },
     parentInclusion: { type: String, default: "" },
     parentProgress: { type: Number, default: 0, min: 0, max: 100 },
-    studentParentFeedback: { type: String, default: "" },
+    q1_advocateEquity: { type: String, default: "" },
+    q2_scaffolding: { type: String, default: "" },
+    q3_fitWithinUnit: { type: String, default: "" },
+    q4_assessmentData: { type: String, default: "" },
+    q5_barriersChallenges: { type: String, default: "" },
+    q6_showLearningWays: { type: String, default: "" },
     status: {
       type: String,
       enum: ["draft", "completed"],

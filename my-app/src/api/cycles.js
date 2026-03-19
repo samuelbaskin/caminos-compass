@@ -53,6 +53,48 @@ export async function savePaso(cycleId, pasoNum, data) {
   return handleRes(res);
 }
 
+export async function getPaso2General(cycleId) {
+  const res = await fetch(`${BASE_URL}/api/cycles/${cycleId}/paso/2/general`, { headers: headers() });
+  return handleRes(res);
+}
+
+export async function savePaso2General(cycleId, data) {
+  const res = await fetch(`${BASE_URL}/api/cycles/${cycleId}/paso/2/general`, {
+    method: "PUT",
+    headers: headers(),
+    body: JSON.stringify(data),
+  });
+  return handleRes(res);
+}
+
+export async function getPaso3General(cycleId) {
+  const res = await fetch(`${BASE_URL}/api/cycles/${cycleId}/paso/3/general`, { headers: headers() });
+  return handleRes(res);
+}
+
+export async function savePaso3General(cycleId, data) {
+  const res = await fetch(`${BASE_URL}/api/cycles/${cycleId}/paso/3/general`, {
+    method: "PUT",
+    headers: headers(),
+    body: JSON.stringify(data),
+  });
+  return handleRes(res);
+}
+
+export async function getPaso4General(cycleId) {
+  const res = await fetch(`${BASE_URL}/api/cycles/${cycleId}/paso/4/general`, { headers: headers() });
+  return handleRes(res);
+}
+
+export async function savePaso4General(cycleId, data) {
+  const res = await fetch(`${BASE_URL}/api/cycles/${cycleId}/paso/4/general`, {
+    method: "PUT",
+    headers: headers(),
+    body: JSON.stringify(data),
+  });
+  return handleRes(res);
+}
+
 export async function listStudents(cycleId) {
   const res = await fetch(`${BASE_URL}/api/students?cycleId=${cycleId}`, { headers: headers() });
   return handleRes(res);

@@ -2,8 +2,11 @@ const express = require("express");
 const TeacherCycle = require("../models/TeacherCycle");
 const Paso1Submission = require("../models/Paso1Submission");
 const Paso2Submission = require("../models/Paso2Submission");
+const Paso2GeneralSubmission = require("../models/Paso2GeneralSubmission");
 const Paso3Submission = require("../models/Paso3Submission");
+const Paso3GeneralSubmission = require("../models/Paso3GeneralSubmission");
 const Paso4Submission = require("../models/Paso4Submission");
+const Paso4GeneralSubmission = require("../models/Paso4GeneralSubmission");
 const Paso5Submission = require("../models/Paso5Submission");
 const Paso6Submission = require("../models/Paso6Submission");
 const Student = require("../models/Student");
@@ -86,7 +89,27 @@ function normalizeStatus(body) {
   return body;
 }
 
-const PASO1_KEYS = ["positionality", "assumptions", "relationshipToStudents", "awarenessOfBias", "instructionalIntention"];
+const PASO1_KEYS = ["q1_positionality", "q2_hiddenCurriculum", "q3_explicitTeaching", "q4_contentKnowledge", "q5_learningProcess", "q6_studentRelationship", "q7_diversityAffirmation", "q8_learnerModeling", "q9_growthMindset", "q10_preparedness"];
+
+const PASO2_GENERAL_KEYS = ["q1_studentReadiness", "q2_priorKnowledge", "q3_retentionCheck", "q4_academicSkills", "q5_skillPatterns", "q6_differentiation", "q7_languageProficiency", "q8_fundsOfKnowledge", "q9_familyDynamics", "q10_backgroundKnowledge"];
+
+const PASO3_GENERAL_KEYS = ["q1_humanizingPedagogy", "q2_presentLearningObjective", "q3_barriers", "q4_accommodations", "q5_resourcesMaterials", "q6_studentEngagement", "q7_classroomEnvironment", "q8_relateToLives", "q9_backgroundKnowledge"];
+
+const PASO4_GENERAL_KEYS = ["q1_equitableAccess", "q2_supportingEnglishLearners", "q3_homeLanguageSupport", "q4_culturalRelevance", "q5_engagementRepresentation", "q6_groupingForEquity", "q7_essentialQuestionRelevance"];
+
+function normalizeResponseBody(body, keys) {
+  const out = { status: body.status === "complete" ? "completed" : (body.status || "draft") };
+  for (const key of keys) {
+    const val = body[key];
+    if (val === undefined) continue;
+    if (typeof val === "object" && val !== null && "response" in val) {
+      out[key] = { response: val.response || "", isDraft: val.isDraft !== false };
+    } else {
+      out[key] = { response: typeof val === "string" ? val : "", isDraft: true };
+    }
+  }
+  return out;
+}
 
 function normalizePaso1Body(body) {
   const out = { status: body.status === "complete" ? "completed" : (body.status || "draft") };
@@ -123,12 +146,45 @@ router.put("/:id/paso/1", async (req, res) => {
   }
 });
 
-// ---- Paso 2 (per student) ----
+// ---- Paso 2 General Questions (Section 1) ----
+router.get("/:id/paso/2/general", async (req, res) => {
+  try {
+    const sub = await Paso2GeneralSubmission.findOne({ teacherCycleId: req.params.id, teacherId: req.user.userId });
+    res.json({ paso2General: sub });
+  } catch (err) {
+    res.status(500).json({ message: "Internal server error." });
+  }
+});
+
+router.put("/:id/paso/2/general", async (req, res) => {
+  try {
+    const normalized = normalizeResponseBody(req.body, PASO2_GENERAL_KEYS);
+    const data = {
+      teacherCycleId: req.params.id,
+      teacherId: req.user.userId,
+      ...normalized,
+    };
+    const sub = await Paso2GeneralSubmission.findOneAndUpdate(
+      { teacherCycleId: req.params.id, teacherId: req.user.userId },
+      data,
+      { upsert: true, new: true, runValidators: true }
+    );
+    res.json({ paso2General: sub });
+  } catch (err) {
+    console.error("Paso2 general save error:", err);
+    res.status(500).json({ message: "Internal server error." });
+  }
+});
+
+// ---- Paso 2 Knowledge of Learner/Student Profiles (Section 2) ----
 router.get("/:id/paso/2", async (req, res) => {
   try {
-    const students = await Student.find({ teacherCycleId: req.params.id, teacherId: req.user.userId });
-    const submissions = await Paso2Submission.find({ teacherCycleId: req.params.id, teacherId: req.user.userId });
-    res.json({ students, submissions });
+    const [students, submissions, general] = await Promise.all([
+      Student.find({ teacherCycleId: req.params.id, teacherId: req.user.userId }),
+      Paso2Submission.find({ teacherCycleId: req.params.id, teacherId: req.user.userId }),
+      Paso2GeneralSubmission.findOne({ teacherCycleId: req.params.id, teacherId: req.user.userId }),
+    ]);
+    res.json({ students, submissions, paso2General: general });
   } catch (err) {
     res.status(500).json({ message: "Internal server error." });
   }
@@ -158,11 +214,44 @@ router.put("/:id/paso/2", async (req, res) => {
   }
 });
 
-// ---- Paso 3 ----
+// ---- Paso 3 General Questions (Section 1) ----
+router.get("/:id/paso/3/general", async (req, res) => {
+  try {
+    const sub = await Paso3GeneralSubmission.findOne({ teacherCycleId: req.params.id, teacherId: req.user.userId });
+    res.json({ paso3General: sub });
+  } catch (err) {
+    res.status(500).json({ message: "Internal server error." });
+  }
+});
+
+router.put("/:id/paso/3/general", async (req, res) => {
+  try {
+    const normalized = normalizeResponseBody(req.body, PASO3_GENERAL_KEYS);
+    const data = {
+      teacherCycleId: req.params.id,
+      teacherId: req.user.userId,
+      ...normalized,
+    };
+    const sub = await Paso3GeneralSubmission.findOneAndUpdate(
+      { teacherCycleId: req.params.id, teacherId: req.user.userId },
+      data,
+      { upsert: true, new: true, runValidators: true }
+    );
+    res.json({ paso3General: sub });
+  } catch (err) {
+    console.error("Paso3 general save error:", err);
+    res.status(500).json({ message: "Internal server error." });
+  }
+});
+
+// ---- Paso 3 Preliminary Lesson Plan (Section 2) ----
 router.get("/:id/paso/3", async (req, res) => {
   try {
-    const sub = await Paso3Submission.findOne({ teacherCycleId: req.params.id, teacherId: req.user.userId });
-    res.json({ paso3: sub });
+    const [sub, general] = await Promise.all([
+      Paso3Submission.findOne({ teacherCycleId: req.params.id, teacherId: req.user.userId }),
+      Paso3GeneralSubmission.findOne({ teacherCycleId: req.params.id, teacherId: req.user.userId }),
+    ]);
+    res.json({ paso3: sub, paso3General: general });
   } catch (err) {
     res.status(500).json({ message: "Internal server error." });
   }
@@ -184,11 +273,44 @@ router.put("/:id/paso/3", async (req, res) => {
   }
 });
 
-// ---- Paso 4 ----
+// ---- Paso 4 General Questions (Section 1) ----
+router.get("/:id/paso/4/general", async (req, res) => {
+  try {
+    const sub = await Paso4GeneralSubmission.findOne({ teacherCycleId: req.params.id, teacherId: req.user.userId });
+    res.json({ paso4General: sub });
+  } catch (err) {
+    res.status(500).json({ message: "Internal server error." });
+  }
+});
+
+router.put("/:id/paso/4/general", async (req, res) => {
+  try {
+    const normalized = normalizeResponseBody(req.body, PASO4_GENERAL_KEYS);
+    const data = {
+      teacherCycleId: req.params.id,
+      teacherId: req.user.userId,
+      ...normalized,
+    };
+    const sub = await Paso4GeneralSubmission.findOneAndUpdate(
+      { teacherCycleId: req.params.id, teacherId: req.user.userId },
+      data,
+      { upsert: true, new: true, runValidators: true }
+    );
+    res.json({ paso4General: sub });
+  } catch (err) {
+    console.error("Paso4 general save error:", err);
+    res.status(500).json({ message: "Internal server error." });
+  }
+});
+
+// ---- Paso 4 District Guidelines (Section 2) ----
 router.get("/:id/paso/4", async (req, res) => {
   try {
-    const sub = await Paso4Submission.findOne({ teacherCycleId: req.params.id, teacherId: req.user.userId });
-    res.json({ paso4: sub });
+    const [sub, general] = await Promise.all([
+      Paso4Submission.findOne({ teacherCycleId: req.params.id, teacherId: req.user.userId }),
+      Paso4GeneralSubmission.findOne({ teacherCycleId: req.params.id, teacherId: req.user.userId }),
+    ]);
+    res.json({ paso4: sub, paso4General: general });
   } catch (err) {
     res.status(500).json({ message: "Internal server error." });
   }
@@ -223,8 +345,6 @@ router.get("/:id/paso/5", async (req, res) => {
 router.put("/:id/paso/5", async (req, res) => {
   try {
     const body = normalizeStatus({ ...req.body });
-    if (body.partnerWithFamilies !== undefined) body.partnerWithStudentsAndFamilies = body.partnerWithFamilies;
-    if (body.engagementAtProficiency !== undefined) body.engagementAtProficiencyLevel = body.engagementAtProficiency;
     const data = { teacherCycleId: req.params.id, teacherId: req.user.userId, ...body };
     const sub = await Paso5Submission.findOneAndUpdate(
       { teacherCycleId: req.params.id, teacherId: req.user.userId },

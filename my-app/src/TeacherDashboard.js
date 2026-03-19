@@ -5,6 +5,12 @@ import {
   getCycle,
   getPaso,
   savePaso,
+  getPaso2General,
+  savePaso2General,
+  getPaso3General,
+  savePaso3General,
+  getPaso4General,
+  savePaso4General,
   listStudents,
   createStudent,
   uploadWritingSample,
@@ -17,10 +23,10 @@ import {
 
 const PASO_META = [
   { num: 1, label: "Paso 1", name: "Knowledge of Self", section: "pre" },
-  { num: 2, label: "Paso 2", name: "Student Profile", section: "pre" },
-  { num: 3, label: "Paso 3", name: "Preliminary Lesson Plan", section: "pre" },
-  { num: 4, label: "Paso 4", name: "District Guidelines", section: "pre" },
-  { num: 5, label: "Paso 5", name: "Partner with Students & Families", section: "post" },
+  { num: 2, label: "Paso 2", name: "Knowledge of Learner/Student Profile", section: "pre" },
+  { num: 3, label: "Paso 3", name: "Practice of Teaching/Preliminary Lesson Plan", section: "pre" },
+  { num: 4, label: "Paso 4", name: "Knowledge of Sociopolitical Dynamics", section: "pre" },
+  { num: 5, label: "Paso 5", name: "Practice of Knowing Learners, Families & Communities", section: "post" },
   { num: 6, label: "Paso 6", name: "Practice of Advocacy", section: "post" },
 ];
 
@@ -41,11 +47,16 @@ function Toast({ msg, type, onDone }) {
 /* ─── Paso 1 : Knowledge of Self ─────────────────────────────────────── */
 
 const PASO1_FIELDS = [
-  { key: "positionality", label: "Positionality", placeholder: "Reflect on your own identity, background, and how it shapes your teaching…" },
-  { key: "assumptions", label: "Assumptions", placeholder: "What assumptions do you hold about your students and their communities?" },
-  { key: "relationshipToStudents", label: "Relationship to Students", placeholder: "Describe your relationship with your students and how you build trust…" },
-  { key: "awarenessOfBias", label: "Awareness of Bias", placeholder: "Identify biases you are aware of and how they might affect instruction…" },
-  { key: "instructionalIntention", label: "Instructional Intention", placeholder: "What are your goals and intentions for equitable instruction?" },
+  { key: "q1_positionality", label: "1. Positionality in Relation to Content", placeholder: "What is your positionality in relation to the content?" },
+  { key: "q2_hiddenCurriculum", label: "2. The Hidden Curriculum", placeholder: "What is the 'hidden curriculum'?" },
+  { key: "q3_explicitTeaching", label: "3. Explicit Teaching for All Students", placeholder: "What should all students know about the content, classroom expectations, or routines? How will you ensure all students are explicitly taught this?" },
+  { key: "q4_contentKnowledge", label: "4. Knowledge of Content", placeholder: "What is your knowledge of the content you will be teaching in this lesson?" },
+  { key: "q5_learningProcess", label: "5. Your Learning Process", placeholder: "How did you learn it? How does your own learning process inform how to teach it and how to support students who may struggle?" },
+  { key: "q6_studentRelationship", label: "6. Connection to Students and Culture", placeholder: "What is your connection/relationship to your students and their culture?" },
+  { key: "q7_diversityAffirmation", label: "7. Acknowledging Positionality and Celebrating Diversity", placeholder: "How will you acknowledge your positionality and celebrate diversity, name privilege and/or affirm cultural, linguistic, or ability identities in relation to your students?" },
+  { key: "q8_learnerModeling", label: "8. Modeling as a Learner", placeholder: "How are you going to acknowledge yourself as a learner? What are you going to model as a learner?" },
+  { key: "q9_growthMindset", label: "9. Growth Mindset and Mistakes", placeholder: "How can you model when you make a mistake or have difficulty? How can you model a growth mindset?" },
+  { key: "q10_preparedness", label: "10. Preparation and Confidence", placeholder: "What do you need to do to feel prepared and confident to teach?" },
 ];
 
 function Paso1Form({ data, onChange, onSave, saving }) {
@@ -87,9 +98,23 @@ function Paso1Form({ data, onChange, onSave, saving }) {
   );
 }
 
-/* ─── Paso 2 : Student Profile ───────────────────────────────────────── */
+/* ─── Paso 2 : Knowledge of Learner/Student Profile ──────────────────── */
+
+const PASO2_GENERAL_FIELDS = [
+  { key: "q1_studentReadiness", label: "1. Student Readiness", placeholder: "What information do you have about student readiness for this lesson?" },
+  { key: "q2_priorKnowledge", label: "2. Prior Knowledge Assessment", placeholder: "What ways have you assessed your students' prior knowledge?" },
+  { key: "q3_retentionCheck", label: "3. Retention of Prior Skills", placeholder: "How can you check for retention of prior skills or knowledge at the beginning of the lesson?" },
+  { key: "q4_academicSkills", label: "4. Academic Skills", placeholder: "What do you know about the reading, language, writing, or math skills of your students?" },
+  { key: "q5_skillPatterns", label: "5. Patterns in Academic Skills", placeholder: "What patterns do you see regarding your students' academic skills?" },
+  { key: "q6_differentiation", label: "6. Differentiation Preparation", placeholder: "How have you prepared the lesson to differentiate for these various levels?" },
+  { key: "q7_languageProficiency", label: "7. Language Proficiency Support", placeholder: "How will students with varying language proficiency levels be supported in this lesson?" },
+  { key: "q8_fundsOfKnowledge", label: "8. Funds of Knowledge", placeholder: "What funds of knowledge do students bring to this lesson/content?" },
+  { key: "q9_familyDynamics", label: "9. Parents and Family Dynamics", placeholder: "What do you know about the parents or family dynamics of the students?" },
+  { key: "q10_backgroundKnowledge", label: "10. Background Knowledge", placeholder: "What background knowledge do students bring to the lesson?" },
+];
 
 function Paso2Form({ cycleId, data, onChange, onSave, saving }) {
+  const [activeSection, setActiveSection] = useState("general");
   const [students, setStudents] = useState([]);
   const [loadingStudents, setLoadingStudents] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
@@ -99,6 +124,9 @@ function Paso2Form({ cycleId, data, onChange, onSave, saving }) {
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [studentError, setStudentError] = useState("");
+  const [generalData, setGeneralData] = useState({});
+  const [generalSaving, setGeneralSaving] = useState(false);
+  const [generalLoaded, setGeneralLoaded] = useState(false);
 
   const fetchStudents = useCallback(async () => {
     if (!cycleId) return;
@@ -111,6 +139,32 @@ function Paso2Form({ cycleId, data, onChange, onSave, saving }) {
   }, [cycleId]);
 
   useEffect(() => { fetchStudents(); }, [fetchStudents]);
+
+  useEffect(() => {
+    if (!cycleId || generalLoaded) return;
+    (async () => {
+      try {
+        const res = await getPaso2General(cycleId);
+        if (res.paso2General) setGeneralData(res.paso2General);
+      } catch { /* silent */ }
+      setGeneralLoaded(true);
+    })();
+  }, [cycleId, generalLoaded]);
+
+  async function handleSaveGeneral(mode) {
+    if (!cycleId) return;
+    setGeneralSaving(true);
+    try {
+      const status = mode === "complete" ? "completed" : "draft";
+      const { _id, __v, createdAt, updatedAt, teacherCycleId, teacherId, ...clean } = generalData;
+      await savePaso2General(cycleId, { ...clean, status });
+    } catch { /* silent */ }
+    setGeneralSaving(false);
+  }
+
+  function handleGeneralChange(key, value) {
+    setGeneralData((prev) => ({ ...prev, [key]: { response: value, isDraft: true } }));
+  }
 
   async function handleAddStudent() {
     if (!newStudent.firstName || !newStudent.lastName) {
@@ -165,163 +219,237 @@ function Paso2Form({ cycleId, data, onChange, onSave, saving }) {
   return (
     <div className="paso-form">
       <div className="paso-form__header">
-        <h2 className="paso-form__title">Paso 2 — Student Profile</h2>
+        <h2 className="paso-form__title">Paso 2 — Knowledge of Learner/Student Profile</h2>
         <p className="paso-form__desc">
-          Build detailed profiles for your students. Add students, upload writing samples, and review LLM evaluations.
+          Complete both sections: general questions about your student cohort, then build individual student profiles.
         </p>
       </div>
 
-      <div className="paso-form__section">
-        <div className="paso-form__section-header">
-          <h3 className="paso-form__section-title">Students</h3>
-          <button className="btn btn--ghost paso-btn-sm" onClick={() => setShowAdd(!showAdd)}>
-            {showAdd ? "Cancel" : "+ Add Student"}
-          </button>
-        </div>
+      <div className="paso-section-tabs" style={{ display: "flex", gap: 0, marginBottom: 20, borderBottom: "2px solid var(--border)" }}>
+        <button
+          className={`paso-section-tab ${activeSection === "general" ? "paso-section-tab--active" : ""}`}
+          onClick={() => setActiveSection("general")}
+          style={{
+            padding: "10px 20px", fontWeight: 600, fontSize: ".9rem", border: "none", cursor: "pointer",
+            background: activeSection === "general" ? "var(--accent)" : "transparent",
+            color: activeSection === "general" ? "#fff" : "var(--text)",
+            borderRadius: "8px 8px 0 0",
+          }}
+        >
+          Section 1 — General Questions
+        </button>
+        <button
+          className={`paso-section-tab ${activeSection === "students" ? "paso-section-tab--active" : ""}`}
+          onClick={() => setActiveSection("students")}
+          style={{
+            padding: "10px 20px", fontWeight: 600, fontSize: ".9rem", border: "none", cursor: "pointer",
+            background: activeSection === "students" ? "var(--accent)" : "transparent",
+            color: activeSection === "students" ? "#fff" : "var(--text)",
+            borderRadius: "8px 8px 0 0",
+          }}
+        >
+          Section 2 — Student Profiles
+        </button>
+      </div>
 
-        {showAdd && (
-          <div className="paso-card paso-card--add">
-            {studentError && <p className="auth-message auth-message--error">{studentError}</p>}
-            <div className="auth-grid-two">
-              <div className="auth-field">
-                <label className="auth-label">First Name</label>
-                <input className="auth-input" value={newStudent.firstName} onChange={(e) => setNewStudent({ ...newStudent, firstName: e.target.value })} />
-              </div>
-              <div className="auth-field">
-                <label className="auth-label">Last Name</label>
-                <input className="auth-input" value={newStudent.lastName} onChange={(e) => setNewStudent({ ...newStudent, lastName: e.target.value })} />
-              </div>
-            </div>
-            <div className="auth-grid-two" style={{ marginTop: 10 }}>
-              <div className="auth-field">
-                <label className="auth-label">Grade</label>
-                <input className="auth-input" value={newStudent.grade} onChange={(e) => setNewStudent({ ...newStudent, grade: e.target.value })} />
-              </div>
-              <div className="auth-field">
-                <label className="auth-label">Demographics</label>
-                <input className="auth-input" placeholder="e.g. ELL, IEP, Gifted" value={newStudent.demographics} onChange={(e) => setNewStudent({ ...newStudent, demographics: e.target.value })} />
-              </div>
-            </div>
-            <div className="paso-form__actions" style={{ marginTop: 12 }}>
-              <button className="btn btn--resume paso-btn-sm" disabled={adding} onClick={handleAddStudent}>
-                {adding ? "Adding…" : "Add Student"}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {loadingStudents ? (
-          <p className="paso-muted">Loading students…</p>
-        ) : students.length === 0 ? (
-          <p className="paso-muted">No students added yet. Click "Add Student" above.</p>
-        ) : (
-          <div className="paso-student-list">
-            {students.map((s) => (
-              <div
-                key={s._id || s.id}
-                className={`paso-student-row ${selectedStudent && (selectedStudent._id || selectedStudent.id) === (s._id || s.id) ? "paso-student-row--selected" : ""}`}
-                onClick={() => {
-                  setSelectedStudent(s);
-                  setSampleText((s.writingSamplePre || "").trim());
-                }}
-              >
-                <div className="paso-student-row__avatar">{(s.firstName || "?")[0]}</div>
-                <div className="paso-student-row__info">
-                  <span className="paso-student-row__name">{s.firstName} {s.lastName}</span>
-                  <span className="paso-student-row__meta">
-                    {s.grade ? `Grade ${s.grade}` : ""}
-                    {s.demographics ? ` · ${s.demographics}` : ""}
-                  </span>
-                </div>
-                {s.writingSample && <span className="paso-student-row__badge">Sample ✓</span>}
-                {s.llmEvaluation && <span className="paso-student-row__badge paso-student-row__badge--eval">Evaluated</span>}
+      {activeSection === "general" && (
+        <>
+          <div className="paso-form__section">
+            <h3 className="paso-form__section-title">General Questions</h3>
+            <p className="paso-form__desc" style={{ marginBottom: 16 }}>
+              Answer the following questions about your overall knowledge of your students and their readiness.
+            </p>
+            {PASO2_GENERAL_FIELDS.map((f) => (
+              <div key={f.key} className="auth-field" style={{ marginBottom: 16 }}>
+                <label className="auth-label" style={{ fontWeight: 600, marginBottom: 4, display: "block" }}>{f.label}</label>
+                <textarea
+                  className="auth-input paso-textarea"
+                  rows={3}
+                  placeholder={f.placeholder}
+                  value={generalData[f.key]?.response || ""}
+                  onChange={(e) => handleGeneralChange(f.key, e.target.value)}
+                />
               </div>
             ))}
           </div>
-        )}
-      </div>
-
-      {selectedStudent && (
-        <div className="paso-form__section">
-          <h3 className="paso-form__section-title">
-            Writing Sample — {selectedStudent.firstName} {selectedStudent.lastName}
-          </h3>
-          {selectedStudent.llmEvaluation && (
-            <div className="paso-card paso-card--eval">
-              <h4 className="paso-card__label">LLM Evaluation</h4>
-              <p className="paso-card__text">{selectedStudent.llmEvaluation}</p>
-            </div>
-          )}
-          <div className="auth-field">
-            <label className="auth-label">Paste or type the writing sample</label>
-            <textarea
-              className="auth-input paso-textarea"
-              rows={6}
-              placeholder="Enter student's writing sample here…"
-              value={sampleText}
-              onChange={(e) => setSampleText(e.target.value)}
-            />
-          </div>
-          <div className="paso-form__actions" style={{ marginTop: 10, flexWrap: "wrap", gap: 8 }}>
-            <button className="btn btn--resume paso-btn-sm" disabled={uploading || !sampleText.trim()} onClick={handleUploadSample}>
-              {uploading ? "Evaluating…" : "Upload & Evaluate"}
+          <div className="paso-form__actions">
+            <button className="btn btn--ghost" disabled={generalSaving} onClick={() => handleSaveGeneral("draft")}>
+              {generalSaving ? "Saving…" : "Save Draft"}
             </button>
-            {hasExistingSample && (
-              <button
-                className="btn btn--ghost paso-btn-sm"
-                disabled={uploading}
-                onClick={handleRetryEvaluation}
-                title="Re-run LLM evaluation with the current or saved sample"
-              >
-                {uploading ? "Evaluating…" : "Retry evaluation"}
-              </button>
-            )}
+            <button className="btn btn--resume" disabled={generalSaving} onClick={() => { handleSaveGeneral("complete"); setActiveSection("students"); }}>
+              {generalSaving ? "Saving…" : "Save & Continue to Section 2 →"}
+            </button>
           </div>
-          {evaluationIsError && (
-            <p className="paso-muted" style={{ marginTop: 8 }}>
-              Previous evaluation failed (e.g. quota). Fix your API quota or click &quot;Retry evaluation&quot; to try again.
-            </p>
-          )}
-        </div>
+        </>
       )}
 
-      <div className="paso-form__section">
-        <h3 className="paso-form__section-title">Additional Notes</h3>
-        <div className="auth-field">
-          <textarea
-            className="auth-input paso-textarea"
-            rows={4}
-            placeholder="Any additional context about your student cohort…"
-            value={data.notes || ""}
-            onChange={(e) => onChange({ ...data, notes: e.target.value })}
-          />
-        </div>
-      </div>
+      {activeSection === "students" && (
+        <>
+          <div className="paso-form__section">
+            <div className="paso-form__section-header">
+              <h3 className="paso-form__section-title">Students</h3>
+              <button className="btn btn--ghost paso-btn-sm" onClick={() => setShowAdd(!showAdd)}>
+                {showAdd ? "Cancel" : "+ Add Student"}
+              </button>
+            </div>
 
-      <div className="paso-form__actions">
-        <button
-          className="btn btn--ghost"
-          disabled={saving || students.length === 0}
-          onClick={() => onSave("draft", students.length ? { studentId: (selectedStudent || students[0])._id || (selectedStudent || students[0]).id, notes: data.notes || "" } : null)}
-        >
-          {saving ? "Saving…" : "Save Draft"}
-        </button>
-        <button
-          className="btn btn--resume"
-          disabled={saving || students.length === 0}
-          onClick={() => onSave("complete", students.length ? { studentId: (selectedStudent || students[0])._id || (selectedStudent || students[0]).id, notes: data.notes || "" } : null)}
-        >
-          {saving ? "Saving…" : "Save & Next →"}
-        </button>
-      </div>
-      {students.length === 0 && (
-        <p className="paso-muted" style={{ marginTop: 8 }}>Add at least one student to save Paso 2.</p>
+            {showAdd && (
+              <div className="paso-card paso-card--add">
+                {studentError && <p className="auth-message auth-message--error">{studentError}</p>}
+                <div className="auth-grid-two">
+                  <div className="auth-field">
+                    <label className="auth-label">First Name</label>
+                    <input className="auth-input" value={newStudent.firstName} onChange={(e) => setNewStudent({ ...newStudent, firstName: e.target.value })} />
+                  </div>
+                  <div className="auth-field">
+                    <label className="auth-label">Last Name</label>
+                    <input className="auth-input" value={newStudent.lastName} onChange={(e) => setNewStudent({ ...newStudent, lastName: e.target.value })} />
+                  </div>
+                </div>
+                <div className="auth-grid-two" style={{ marginTop: 10 }}>
+                  <div className="auth-field">
+                    <label className="auth-label">Grade</label>
+                    <input className="auth-input" value={newStudent.grade} onChange={(e) => setNewStudent({ ...newStudent, grade: e.target.value })} />
+                  </div>
+                  <div className="auth-field">
+                    <label className="auth-label">Demographics</label>
+                    <input className="auth-input" placeholder="e.g. ELL, IEP, Gifted" value={newStudent.demographics} onChange={(e) => setNewStudent({ ...newStudent, demographics: e.target.value })} />
+                  </div>
+                </div>
+                <div className="paso-form__actions" style={{ marginTop: 12 }}>
+                  <button className="btn btn--resume paso-btn-sm" disabled={adding} onClick={handleAddStudent}>
+                    {adding ? "Adding…" : "Add Student"}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {loadingStudents ? (
+              <p className="paso-muted">Loading students…</p>
+            ) : students.length === 0 ? (
+              <p className="paso-muted">No students added yet. Click "Add Student" above.</p>
+            ) : (
+              <div className="paso-student-list">
+                {students.map((s) => (
+                  <div
+                    key={s._id || s.id}
+                    className={`paso-student-row ${selectedStudent && (selectedStudent._id || selectedStudent.id) === (s._id || s.id) ? "paso-student-row--selected" : ""}`}
+                    onClick={() => {
+                      setSelectedStudent(s);
+                      setSampleText((s.writingSamplePre || "").trim());
+                    }}
+                  >
+                    <div className="paso-student-row__avatar">{(s.firstName || "?")[0]}</div>
+                    <div className="paso-student-row__info">
+                      <span className="paso-student-row__name">{s.firstName} {s.lastName}</span>
+                      <span className="paso-student-row__meta">
+                        {s.grade ? `Grade ${s.grade}` : ""}
+                        {s.demographics ? ` · ${s.demographics}` : ""}
+                      </span>
+                    </div>
+                    {s.writingSample && <span className="paso-student-row__badge">Sample ✓</span>}
+                    {s.llmEvaluation && <span className="paso-student-row__badge paso-student-row__badge--eval">Evaluated</span>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {selectedStudent && (
+            <div className="paso-form__section">
+              <h3 className="paso-form__section-title">
+                Writing Sample — {selectedStudent.firstName} {selectedStudent.lastName}
+              </h3>
+              {selectedStudent.llmEvaluation && (
+                <div className="paso-card paso-card--eval">
+                  <h4 className="paso-card__label">LLM Evaluation</h4>
+                  <p className="paso-card__text">{selectedStudent.llmEvaluation}</p>
+                </div>
+              )}
+              <div className="auth-field">
+                <label className="auth-label">Paste or type the writing sample</label>
+                <textarea
+                  className="auth-input paso-textarea"
+                  rows={6}
+                  placeholder="Enter student's writing sample here…"
+                  value={sampleText}
+                  onChange={(e) => setSampleText(e.target.value)}
+                />
+              </div>
+              <div className="paso-form__actions" style={{ marginTop: 10, flexWrap: "wrap", gap: 8 }}>
+                <button className="btn btn--resume paso-btn-sm" disabled={uploading || !sampleText.trim()} onClick={handleUploadSample}>
+                  {uploading ? "Evaluating…" : "Upload & Evaluate"}
+                </button>
+                {hasExistingSample && (
+                  <button
+                    className="btn btn--ghost paso-btn-sm"
+                    disabled={uploading}
+                    onClick={handleRetryEvaluation}
+                    title="Re-run LLM evaluation with the current or saved sample"
+                  >
+                    {uploading ? "Evaluating…" : "Retry evaluation"}
+                  </button>
+                )}
+              </div>
+              {evaluationIsError && (
+                <p className="paso-muted" style={{ marginTop: 8 }}>
+                  Previous evaluation failed (e.g. quota). Fix your API quota or click &quot;Retry evaluation&quot; to try again.
+                </p>
+              )}
+            </div>
+          )}
+
+          <div className="paso-form__section">
+            <h3 className="paso-form__section-title">Additional Notes</h3>
+            <div className="auth-field">
+              <textarea
+                className="auth-input paso-textarea"
+                rows={4}
+                placeholder="Any additional context about your student cohort…"
+                value={data.notes || ""}
+                onChange={(e) => onChange({ ...data, notes: e.target.value })}
+              />
+            </div>
+          </div>
+
+          <div className="paso-form__actions">
+            <button
+              className="btn btn--ghost"
+              disabled={saving || students.length === 0}
+              onClick={() => onSave("draft", students.length ? { studentId: (selectedStudent || students[0])._id || (selectedStudent || students[0]).id, notes: data.notes || "" } : null)}
+            >
+              {saving ? "Saving…" : "Save Draft"}
+            </button>
+            <button
+              className="btn btn--resume"
+              disabled={saving || students.length === 0}
+              onClick={() => onSave("complete", students.length ? { studentId: (selectedStudent || students[0])._id || (selectedStudent || students[0]).id, notes: data.notes || "" } : null)}
+            >
+              {saving ? "Saving…" : "Save & Next →"}
+            </button>
+          </div>
+          {students.length === 0 && (
+            <p className="paso-muted" style={{ marginTop: 8 }}>Add at least one student to save Paso 2.</p>
+          )}
+        </>
       )}
     </div>
   );
 }
 
-/* ─── Paso 3 : Preliminary Lesson Plan ───────────────────────────────── */
+/* ─── Paso 3 : Practice of Teaching/Preliminary Lesson Plan ──────────── */
+
+const PASO3_GENERAL_FIELDS = [
+  { key: "q1_humanizingPedagogy", label: "1. Humanizing Pedagogy", placeholder: "How does this lesson plan demonstrate the principles of humanizing pedagogy?" },
+  { key: "q2_presentLearningObjective", label: "2. Presenting Learning Objective", placeholder: "How are you going to present the learning objective to your students?" },
+  { key: "q3_barriers", label: "3. Barriers", placeholder: "What barriers might students encounter during this lesson?" },
+  { key: "q4_accommodations", label: "4. Accommodations or Modifications", placeholder: "What accommodations or modifications will you use to reach all learners?" },
+  { key: "q5_resourcesMaterials", label: "5. Resources or Materials", placeholder: "What resources or materials do you need to engage students in this lesson?" },
+  { key: "q6_studentEngagement", label: "6. Student Engagement", placeholder: "How do you visualize student engagement in this lesson?" },
+  { key: "q7_classroomEnvironment", label: "7. Physical Classroom Environment", placeholder: "What does the physical classroom environment look like for this lesson?" },
+  { key: "q8_relateToLives", label: "8. Relating to Students' Lives", placeholder: "How does the lesson relate to your students' lives?" },
+  { key: "q9_backgroundKnowledge", label: "9. Background Knowledge or Skills", placeholder: "What background knowledge or skills must students possess to participate?" },
+];
 
 const PASO3_FIELDS = [
   { key: "lessonTitle", label: "Lesson Title", type: "text", placeholder: "Enter the lesson title" },
@@ -332,51 +460,159 @@ const PASO3_FIELDS = [
   { key: "materialsResources", label: "Materials & Resources", type: "textarea", placeholder: "List all materials, texts, and resources needed" },
 ];
 
-function Paso3Form({ data, onChange, onSave, saving }) {
+function Paso3Form({ cycleId, data, onChange, onSave, saving }) {
+  const [activeSection, setActiveSection] = useState("general");
+  const [generalData, setGeneralData] = useState({});
+  const [generalSaving, setGeneralSaving] = useState(false);
+  const [generalLoaded, setGeneralLoaded] = useState(false);
+
+  useEffect(() => {
+    if (!cycleId || generalLoaded) return;
+    (async () => {
+      try {
+        const res = await getPaso3General(cycleId);
+        if (res.paso3General) setGeneralData(res.paso3General);
+      } catch { /* silent */ }
+      setGeneralLoaded(true);
+    })();
+  }, [cycleId, generalLoaded]);
+
+  async function handleSaveGeneral(mode) {
+    if (!cycleId) return;
+    setGeneralSaving(true);
+    try {
+      const status = mode === "complete" ? "completed" : "draft";
+      const { _id, __v, createdAt, updatedAt, teacherCycleId, teacherId, ...clean } = generalData;
+      await savePaso3General(cycleId, { ...clean, status });
+    } catch { /* silent */ }
+    setGeneralSaving(false);
+  }
+
+  function handleGeneralChange(key, value) {
+    setGeneralData((prev) => ({ ...prev, [key]: { response: value, isDraft: true } }));
+  }
+
   return (
     <div className="paso-form">
       <div className="paso-form__header">
-        <h2 className="paso-form__title">Paso 3 — Preliminary Lesson Plan</h2>
+        <h2 className="paso-form__title">Paso 3 — Practice of Teaching/Preliminary Lesson Plan</h2>
         <p className="paso-form__desc">
-          Draft your initial lesson plan. This will be refined through the coaching process.
+          Complete both sections: general questions about your teaching practice, then your preliminary lesson plan.
         </p>
       </div>
-      {PASO3_FIELDS.map((f) => (
-        <div key={f.key} className="paso-form__section">
-          <div className="auth-field">
-            <label className="auth-label">{f.label}</label>
-            {f.type === "textarea" ? (
-              <textarea
-                className="auth-input paso-textarea"
-                rows={5}
-                placeholder={f.placeholder}
-                value={data[f.key] || ""}
-                onChange={(e) => onChange({ ...data, [f.key]: e.target.value })}
-              />
-            ) : (
-              <input
-                className="auth-input"
-                placeholder={f.placeholder}
-                value={data[f.key] || ""}
-                onChange={(e) => onChange({ ...data, [f.key]: e.target.value })}
-              />
-            )}
-          </div>
-        </div>
-      ))}
-      <div className="paso-form__actions">
-        <button className="btn btn--ghost" disabled={saving} onClick={() => onSave("draft")}>
-          {saving ? "Saving…" : "Save Draft"}
+
+      <div className="paso-section-tabs" style={{ display: "flex", gap: 0, marginBottom: 20, borderBottom: "2px solid var(--border)" }}>
+        <button
+          className={`paso-section-tab ${activeSection === "general" ? "paso-section-tab--active" : ""}`}
+          onClick={() => setActiveSection("general")}
+          style={{
+            padding: "10px 20px", fontWeight: 600, fontSize: ".9rem", border: "none", cursor: "pointer",
+            background: activeSection === "general" ? "var(--accent)" : "transparent",
+            color: activeSection === "general" ? "#fff" : "var(--text)",
+            borderRadius: "8px 8px 0 0",
+          }}
+        >
+          Section 1 — General Questions
         </button>
-        <button className="btn btn--resume" disabled={saving} onClick={() => onSave("complete")}>
-          {saving ? "Saving…" : "Save & Next →"}
+        <button
+          className={`paso-section-tab ${activeSection === "plan" ? "paso-section-tab--active" : ""}`}
+          onClick={() => setActiveSection("plan")}
+          style={{
+            padding: "10px 20px", fontWeight: 600, fontSize: ".9rem", border: "none", cursor: "pointer",
+            background: activeSection === "plan" ? "var(--accent)" : "transparent",
+            color: activeSection === "plan" ? "#fff" : "var(--text)",
+            borderRadius: "8px 8px 0 0",
+          }}
+        >
+          Section 2 — Preliminary Lesson Plan
         </button>
       </div>
+
+      {activeSection === "general" && (
+        <>
+          <div className="paso-form__section">
+            <h3 className="paso-form__section-title">General Questions</h3>
+            <p className="paso-form__desc" style={{ marginBottom: 16 }}>
+              Answer the following questions about your teaching practice and lesson design.
+            </p>
+            {PASO3_GENERAL_FIELDS.map((f) => (
+              <div key={f.key} className="auth-field" style={{ marginBottom: 16 }}>
+                <label className="auth-label" style={{ fontWeight: 600, marginBottom: 4, display: "block" }}>{f.label}</label>
+                <textarea
+                  className="auth-input paso-textarea"
+                  rows={3}
+                  placeholder={f.placeholder}
+                  value={generalData[f.key]?.response || ""}
+                  onChange={(e) => handleGeneralChange(f.key, e.target.value)}
+                />
+              </div>
+            ))}
+          </div>
+          <div className="paso-form__actions">
+            <button className="btn btn--ghost" disabled={generalSaving} onClick={() => handleSaveGeneral("draft")}>
+              {generalSaving ? "Saving…" : "Save Draft"}
+            </button>
+            <button className="btn btn--resume" disabled={generalSaving} onClick={() => { handleSaveGeneral("complete"); setActiveSection("plan"); }}>
+              {generalSaving ? "Saving…" : "Save & Continue to Section 2 →"}
+            </button>
+          </div>
+        </>
+      )}
+
+      {activeSection === "plan" && (
+        <>
+          <div className="paso-form__section">
+            <h3 className="paso-form__section-title">Preliminary Lesson Plan</h3>
+            <p className="paso-form__desc" style={{ marginBottom: 16 }}>
+              Draft your initial lesson plan. This will be refined through the coaching process.
+            </p>
+            {PASO3_FIELDS.map((f) => (
+              <div key={f.key} className="auth-field" style={{ marginBottom: 16 }}>
+                <label className="auth-label">{f.label}</label>
+                {f.type === "textarea" ? (
+                  <textarea
+                    className="auth-input paso-textarea"
+                    rows={5}
+                    placeholder={f.placeholder}
+                    value={data[f.key] || ""}
+                    onChange={(e) => onChange({ ...data, [f.key]: e.target.value })}
+                  />
+                ) : (
+                  <input
+                    className="auth-input"
+                    placeholder={f.placeholder}
+                    value={data[f.key] || ""}
+                    onChange={(e) => onChange({ ...data, [f.key]: e.target.value })}
+                  />
+                )}
+              </div>
+            ))}
+          </div>
+          <div className="paso-form__actions">
+            <button className="btn btn--ghost" disabled={saving} onClick={() => onSave("draft")}>
+              {saving ? "Saving…" : "Save Draft"}
+            </button>
+            <button className="btn btn--resume" disabled={saving} onClick={() => onSave("complete")}>
+              {saving ? "Saving…" : "Save & Next →"}
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }
 
-/* ─── Paso 4 : District Guidelines ───────────────────────────────────── */
+/* ─── Paso 4 : Knowledge of Sociopolitical Dynamics ──────────────────── */
+
+const PASO4_GENERAL_FIELDS = [
+  { key: "q1_equitableAccess", label: "1. Equitable Access to Learning", placeholder: "What factors will influence students' equitable access to learning?" },
+  { key: "q2_supportingEnglishLearners", label: "2. Supporting English Learners", placeholder: "In what ways are you supporting English learners in this lesson?" },
+  { key: "q3_homeLanguageSupport", label: "3. Home Language Support", placeholder: "How are students encouraged to use their home language to support learning?" },
+  { key: "q4_culturalRelevance", label: "4. Cultural Relevance", placeholder: "How can you make the content interesting and relevant to their culture?" },
+  { key: "q5_engagementRepresentation", label: "5. Engagement, Representation, and Expression", placeholder: "How are you making engagement, representation, and expression accessible to all students?" },
+  { key: "q6_groupingForEquity", label: "6. Grouping for Equity", placeholder: "How are you grouping students to support equity?" },
+  { key: "q7_essentialQuestionRelevance", label: "7. Essential Question Relevance", placeholder: "How can the essential question demonstrate relevance for all students regardless of background?" },
+];
 
 const PASO4_FIELDS = [
   { key: "districtStandards", label: "District Standards", placeholder: "Reference the standards your lesson aligns to…" },
@@ -386,55 +622,157 @@ const PASO4_FIELDS = [
   { key: "additionalNotes", label: "Additional Notes", placeholder: "Any other district-specific considerations…" },
 ];
 
-function Paso4Form({ data, onChange, onSave, saving }) {
+function Paso4Form({ cycleId, data, onChange, onSave, saving }) {
+  const [activeSection, setActiveSection] = useState("general");
+  const [generalData, setGeneralData] = useState({});
+  const [generalSaving, setGeneralSaving] = useState(false);
+  const [generalLoaded, setGeneralLoaded] = useState(false);
+
+  useEffect(() => {
+    if (!cycleId || generalLoaded) return;
+    (async () => {
+      try {
+        const res = await getPaso4General(cycleId);
+        if (res.paso4General) setGeneralData(res.paso4General);
+      } catch { /* silent */ }
+      setGeneralLoaded(true);
+    })();
+  }, [cycleId, generalLoaded]);
+
+  async function handleSaveGeneral(mode) {
+    if (!cycleId) return;
+    setGeneralSaving(true);
+    try {
+      const status = mode === "complete" ? "completed" : "draft";
+      const { _id, __v, createdAt, updatedAt, teacherCycleId, teacherId, ...clean } = generalData;
+      await savePaso4General(cycleId, { ...clean, status });
+    } catch { /* silent */ }
+    setGeneralSaving(false);
+  }
+
+  function handleGeneralChange(key, value) {
+    setGeneralData((prev) => ({ ...prev, [key]: { response: value, isDraft: true } }));
+  }
+
   return (
     <div className="paso-form">
       <div className="paso-form__header">
-        <h2 className="paso-form__title">Paso 4 — District Guidelines</h2>
+        <h2 className="paso-form__title">Paso 4 — Knowledge of Sociopolitical Dynamics</h2>
         <p className="paso-form__desc">
-          Document the district-level requirements and standards that frame your instruction.
+          Complete both sections: general questions about sociopolitical dynamics, then district guidelines.
         </p>
       </div>
-      {PASO4_FIELDS.map((f) => (
-        <div key={f.key} className="paso-form__section">
-          <div className="auth-field">
-            <label className="auth-label">{f.label}</label>
-            <textarea
-              className="auth-input paso-textarea"
-              rows={5}
-              placeholder={f.placeholder}
-              value={data[f.key] || ""}
-              onChange={(e) => onChange({ ...data, [f.key]: e.target.value })}
-            />
-          </div>
-        </div>
-      ))}
-      <div className="paso-form__actions">
-        <button className="btn btn--ghost" disabled={saving} onClick={() => onSave("draft")}>
-          {saving ? "Saving…" : "Save Draft"}
+
+      <div className="paso-section-tabs" style={{ display: "flex", gap: 0, marginBottom: 20, borderBottom: "2px solid var(--border)" }}>
+        <button
+          className={`paso-section-tab ${activeSection === "general" ? "paso-section-tab--active" : ""}`}
+          onClick={() => setActiveSection("general")}
+          style={{
+            padding: "10px 20px", fontWeight: 600, fontSize: ".9rem", border: "none", cursor: "pointer",
+            background: activeSection === "general" ? "var(--accent)" : "transparent",
+            color: activeSection === "general" ? "#fff" : "var(--text)",
+            borderRadius: "8px 8px 0 0",
+          }}
+        >
+          Section 1 — General Questions
         </button>
-        <button className="btn btn--resume" disabled={saving} onClick={() => onSave("complete")}>
-          {saving ? "Saving…" : "Save & Next →"}
+        <button
+          className={`paso-section-tab ${activeSection === "guidelines" ? "paso-section-tab--active" : ""}`}
+          onClick={() => setActiveSection("guidelines")}
+          style={{
+            padding: "10px 20px", fontWeight: 600, fontSize: ".9rem", border: "none", cursor: "pointer",
+            background: activeSection === "guidelines" ? "var(--accent)" : "transparent",
+            color: activeSection === "guidelines" ? "#fff" : "var(--text)",
+            borderRadius: "8px 8px 0 0",
+          }}
+        >
+          Section 2 — District Guidelines
         </button>
       </div>
+
+      {activeSection === "general" && (
+        <>
+          <div className="paso-form__section">
+            <h3 className="paso-form__section-title">General Questions</h3>
+            <p className="paso-form__desc" style={{ marginBottom: 16 }}>
+              Answer the following questions about sociopolitical dynamics and equitable access.
+            </p>
+            {PASO4_GENERAL_FIELDS.map((f) => (
+              <div key={f.key} className="auth-field" style={{ marginBottom: 16 }}>
+                <label className="auth-label" style={{ fontWeight: 600, marginBottom: 4, display: "block" }}>{f.label}</label>
+                <textarea
+                  className="auth-input paso-textarea"
+                  rows={3}
+                  placeholder={f.placeholder}
+                  value={generalData[f.key]?.response || ""}
+                  onChange={(e) => handleGeneralChange(f.key, e.target.value)}
+                />
+              </div>
+            ))}
+          </div>
+          <div className="paso-form__actions">
+            <button className="btn btn--ghost" disabled={generalSaving} onClick={() => handleSaveGeneral("draft")}>
+              {generalSaving ? "Saving…" : "Save Draft"}
+            </button>
+            <button className="btn btn--resume" disabled={generalSaving} onClick={() => { handleSaveGeneral("complete"); setActiveSection("guidelines"); }}>
+              {generalSaving ? "Saving…" : "Save & Continue to Section 2 →"}
+            </button>
+          </div>
+        </>
+      )}
+
+      {activeSection === "guidelines" && (
+        <>
+          <div className="paso-form__section">
+            <h3 className="paso-form__section-title">District Guidelines</h3>
+            <p className="paso-form__desc" style={{ marginBottom: 16 }}>
+              Document the district-level requirements and standards that frame your instruction.
+            </p>
+            {PASO4_FIELDS.map((f) => (
+              <div key={f.key} className="auth-field" style={{ marginBottom: 16 }}>
+                <label className="auth-label">{f.label}</label>
+                <textarea
+                  className="auth-input paso-textarea"
+                  rows={5}
+                  placeholder={f.placeholder}
+                  value={data[f.key] || ""}
+                  onChange={(e) => onChange({ ...data, [f.key]: e.target.value })}
+                />
+              </div>
+            ))}
+          </div>
+          <div className="paso-form__actions">
+            <button className="btn btn--ghost" disabled={saving} onClick={() => onSave("draft")}>
+              {saving ? "Saving…" : "Save Draft"}
+            </button>
+            <button className="btn btn--resume" disabled={saving} onClick={() => onSave("complete")}>
+              {saving ? "Saving…" : "Save & Next →"}
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }
 
-/* ─── Paso 5 : Partner with Students & Families ──────────────────────── */
+/* ─── Paso 5 : Practice of Knowing Learners, Families & Communities ───── */
 
 const PASO5_FIELDS = [
-  { key: "homeLanguageSupport", label: "Home Language Support", placeholder: "How do you incorporate students' home languages into instruction?" },
-  { key: "equitableTreatment", label: "Equitable Treatment", placeholder: "How do you ensure every student receives fair and equitable treatment?" },
-  { key: "engagementAtProficiency", label: "Engagement at Proficiency Level", placeholder: "How do you engage students at their current proficiency level?" },
-  { key: "partnerWithFamilies", label: "Partner with Students & Families", placeholder: "How do you involve families as partners in the learning process?" },
+  { key: "q1_partnerConnect", label: "1. How will you partner and connect with your students through this lesson?", placeholder: "Describe how you will partner and connect with your students…" },
+  { key: "q2_greetStudents", label: "2. What are ways to greet students as they enter the classroom?", placeholder: "Describe ways to greet students as they enter…" },
+  { key: "q3_comfortableParticipate", label: "3. How can students feel comfortable and eager to participate?", placeholder: "Describe strategies for student comfort and participation…" },
+  { key: "q4_teamBuilding", label: "4. How can team-building activities help students know each other better?", placeholder: "Describe how team-building activities support connection…" },
+  { key: "q5_getToKnowStudents", label: "5. How will you get to know students' interests, culture, language, and family backgrounds?", placeholder: "Describe how you will learn about students…" },
+  { key: "q6_topicRelevant", label: "6. How can you make the topic interesting and relevant for all students?", placeholder: "Describe strategies for relevance and engagement…" },
+  { key: "q7_learningModalities", label: "7. How are you incorporating various learning modalities to address learning preferences?", placeholder: "Describe how you address different learning modalities…" },
+  { key: "q8_activitiesToLearn", label: "8. What activities will you use to learn more about your students?", placeholder: "Describe activities to learn about your students…" },
 ];
 
 function Paso5Form({ data, onChange, onSave, saving }) {
   return (
     <div className="paso-form">
       <div className="paso-form__header">
-        <h2 className="paso-form__title">Paso 5 — Partner with Students & Families</h2>
+        <h2 className="paso-form__title">Paso 5 — Practice of Knowing Learners, Families & Communities</h2>
         <p className="paso-form__desc">
           Describe how you center student and family voice, language, and culture in your practice.
         </p>
@@ -474,10 +812,13 @@ const PASO6_CATEGORIES = [
   { key: "parentInclusion", label: "Parent Inclusion", icon: "👪" },
 ];
 
-const PASO6_FEEDBACK_FIELDS = [
-  { key: "studentFeedback", label: "Student Feedback", placeholder: "Summarize feedback from students on your teaching and advocacy…" },
-  { key: "parentFeedback", label: "Parent/Family Feedback", placeholder: "Summarize feedback from parents and families…" },
-  { key: "selfReflection", label: "Self-Reflection", placeholder: "Reflect on your growth as an advocate for equitable education…" },
+const PASO6_ADVOCACY_FIELDS = [
+  { key: "q1_advocateEquity", label: "1. How will you advocate for equity and social justice in this lesson or unit?", placeholder: "Describe your approach to advocating for equity and social justice…" },
+  { key: "q2_scaffolding", label: "2. What approach will you take to scaffolding student learning?", placeholder: "Describe your scaffolding approach…" },
+  { key: "q3_fitWithinUnit", label: "3. How does this lesson fit within a larger unit or learning goal?", placeholder: "Describe how this lesson connects to the larger unit…" },
+  { key: "q4_assessmentData", label: "4. What assessment data informed the focus of this lesson?", placeholder: "Describe the assessment data that informed this lesson…" },
+  { key: "q5_barriersChallenges", label: "5. What barriers or challenges might arise and how will you plan for them?", placeholder: "Describe potential barriers and your planning…" },
+  { key: "q6_showLearningWays", label: "6. How can you create opportunities for students to show learning in different ways?", placeholder: "Describe varied ways for students to demonstrate learning…" },
 ];
 
 function Paso6Form({ data, onChange, onSave, saving }) {
@@ -522,8 +863,8 @@ function Paso6Form({ data, onChange, onSave, saving }) {
       </div>
 
       <div className="paso-form__section">
-        <h3 className="paso-form__section-title">Feedback Questionnaire</h3>
-        {PASO6_FEEDBACK_FIELDS.map((f) => (
+        <h3 className="paso-form__section-title">Advocacy Questions</h3>
+        {PASO6_ADVOCACY_FIELDS.map((f) => (
           <div key={f.key} className="auth-field" style={{ marginBottom: 14 }}>
             <label className="auth-label">{f.label}</label>
             <textarea
@@ -653,7 +994,12 @@ function LessonPlanView({ plan, onRegenerate, generating, onSaveContent, onFinal
   const status = isDoc ? plan.status : null;
 
   const inputSummary = inputs ? {
-    paso1Fields: inputs.paso1 ? ["positionality", "assumptions", "relationshipToStudents", "awarenessOfBias", "instructionalIntention"].filter((k) => inputs.paso1[k]?.response) : [],
+    paso1Fields: inputs.paso1 ? ["q1_positionality", "q2_hiddenCurriculum", "q3_explicitTeaching", "q4_contentKnowledge", "q5_learningProcess", "q6_studentRelationship", "q7_diversityAffirmation", "q8_learnerModeling", "q9_growthMindset", "q10_preparedness"].filter((k) => inputs.paso1[k]?.response) : [],
+    paso2GeneralFields: inputs.paso2General ? PASO2_GENERAL_FIELDS.filter((f) => inputs.paso2General[f.key]?.response) : [],
+    paso3GeneralFields: inputs.paso3General ? PASO3_GENERAL_FIELDS.filter((f) => inputs.paso3General[f.key]?.response) : [],
+    paso4GeneralFields: inputs.paso4General ? PASO4_GENERAL_FIELDS.filter((f) => inputs.paso4General[f.key]?.response) : [],
+    paso5Fields: inputs.paso5 ? PASO5_FIELDS.filter((f) => inputs.paso5[f.key]) : [],
+    paso6Fields: inputs.paso6 ? PASO6_ADVOCACY_FIELDS.filter((f) => inputs.paso6[f.key]) : [],
     studentCount: inputs.paso2Students?.length || 0,
     students: (inputs.paso2Students || []).map((s) => `${s.student?.firstName || "?"} ${s.student?.lastName || ""}`),
     lessonTitle: inputs.paso3?.lessonTitle || null,
@@ -671,7 +1017,7 @@ function LessonPlanView({ plan, onRegenerate, generating, onSaveContent, onFinal
               {inputs?.paso3?.lessonTitle || "Generated Lesson Plan"}
             </h2>
             <p className="lp-header__sub">
-              {[inputs?.paso3?.subjectArea, inputs?.paso3?.gradeLevel].filter(Boolean).join(" · ") || "Generated from Pasos 1–5"}
+              {[inputs?.paso3?.subjectArea, inputs?.paso3?.gradeLevel].filter(Boolean).join(" · ") || "Generated from Pasos 1–6"}
             </p>
           </div>
           {status && (
@@ -691,8 +1037,28 @@ function LessonPlanView({ plan, onRegenerate, generating, onSaveContent, onFinal
       {inputSummary && (
         <div className="lp-stats">
           <div className="lp-stat">
-            <span className="lp-stat__num">{inputSummary.paso1Fields.length}/5</span>
+            <span className="lp-stat__num">{inputSummary.paso1Fields.length}/10</span>
             <span className="lp-stat__label">Paso 1 Reflections</span>
+          </div>
+          <div className="lp-stat">
+            <span className="lp-stat__num">{inputSummary.paso2GeneralFields.length}/10</span>
+            <span className="lp-stat__label">Paso 2 General</span>
+          </div>
+          <div className="lp-stat">
+            <span className="lp-stat__num">{inputSummary.paso3GeneralFields.length}/9</span>
+            <span className="lp-stat__label">Paso 3 General</span>
+          </div>
+          <div className="lp-stat">
+            <span className="lp-stat__num">{inputSummary.paso4GeneralFields.length}/7</span>
+            <span className="lp-stat__label">Paso 4 General</span>
+          </div>
+          <div className="lp-stat">
+            <span className="lp-stat__num">{inputSummary.paso5Fields.length}/8</span>
+            <span className="lp-stat__label">Paso 5</span>
+          </div>
+          <div className="lp-stat">
+            <span className="lp-stat__num">{inputSummary.paso6Fields.length}/6</span>
+            <span className="lp-stat__label">Paso 6</span>
           </div>
           <div className="lp-stat">
             <span className="lp-stat__num">{inputSummary.studentCount}</span>
@@ -773,18 +1139,28 @@ function LessonPlanView({ plan, onRegenerate, generating, onSaveContent, onFinal
           {inputs.paso1 && (
             <div className="lp-inputs__section">
               <h4>Paso 1 — Knowledge of Self</h4>
-              {["positionality", "assumptions", "relationshipToStudents", "awarenessOfBias", "instructionalIntention"].map((k) => {
-                const v = inputs.paso1[k]?.response;
+              {PASO1_FIELDS.map((f) => {
+                const v = inputs.paso1[f.key]?.response;
                 if (!v) return null;
-                const label = k.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase());
-                return <div key={k} className="lp-inputs__field"><strong>{label}:</strong> {v}</div>;
+                return <div key={f.key} className="lp-inputs__field"><strong>{f.label}:</strong> {v}</div>;
+              })}
+            </div>
+          )}
+
+          {inputs.paso2General && (
+            <div className="lp-inputs__section">
+              <h4>Paso 2 — Section 1: General Questions</h4>
+              {PASO2_GENERAL_FIELDS.map((f) => {
+                const v = inputs.paso2General[f.key]?.response;
+                if (!v) return null;
+                return <div key={f.key} className="lp-inputs__field"><strong>{f.label}:</strong> {v}</div>;
               })}
             </div>
           )}
 
           {inputs.paso2Students?.length > 0 && (
             <div className="lp-inputs__section">
-              <h4>Paso 2 — Students ({inputs.paso2Students.length})</h4>
+              <h4>Paso 2 — Section 2: Students ({inputs.paso2Students.length})</h4>
               {inputs.paso2Students.map((s, i) => (
                 <div key={i} className="lp-inputs__student">
                   <strong>{s.student?.firstName} {s.student?.lastName}</strong>
@@ -798,9 +1174,20 @@ function LessonPlanView({ plan, onRegenerate, generating, onSaveContent, onFinal
             </div>
           )}
 
+          {inputs.paso3General && (
+            <div className="lp-inputs__section">
+              <h4>Paso 3 — Section 1: General Questions</h4>
+              {PASO3_GENERAL_FIELDS.map((f) => {
+                const v = inputs.paso3General[f.key]?.response;
+                if (!v) return null;
+                return <div key={f.key} className="lp-inputs__field"><strong>{f.label}:</strong> {v}</div>;
+              })}
+            </div>
+          )}
+
           {inputs.paso3 && (
             <div className="lp-inputs__section">
-              <h4>Paso 3 — Preliminary Plan</h4>
+              <h4>Paso 3 — Section 2: Preliminary Lesson Plan</h4>
               {[["lessonTitle", "Title"], ["gradeLevel", "Grade"], ["subjectArea", "Subject"], ["lessonObjectives", "Objectives"]].map(([k, l]) => {
                 const v = inputs.paso3[k];
                 if (!v) return null;
@@ -809,9 +1196,20 @@ function LessonPlanView({ plan, onRegenerate, generating, onSaveContent, onFinal
             </div>
           )}
 
+          {inputs.paso4General && (
+            <div className="lp-inputs__section">
+              <h4>Paso 4 — Section 1: General Questions</h4>
+              {PASO4_GENERAL_FIELDS.map((f) => {
+                const v = inputs.paso4General[f.key]?.response;
+                if (!v) return null;
+                return <div key={f.key} className="lp-inputs__field"><strong>{f.label}:</strong> {v}</div>;
+              })}
+            </div>
+          )}
+
           {inputs.paso4 && (
             <div className="lp-inputs__section">
-              <h4>Paso 4 — District Guidelines</h4>
+              <h4>Paso 4 — Section 2: District Guidelines</h4>
               {[["districtStandards", "Standards"], ["curriculumRequirements", "Curriculum"], ["assessmentGuidelines", "Assessment"], ["accommodationPolicies", "Accommodations"]].map(([k, l]) => {
                 const v = inputs.paso4[k];
                 if (!v) return null;
@@ -822,11 +1220,22 @@ function LessonPlanView({ plan, onRegenerate, generating, onSaveContent, onFinal
 
           {inputs.paso5 && (
             <div className="lp-inputs__section">
-              <h4>Paso 5 — Partnering with Students & Families</h4>
-              {[["homeLanguageSupport", "Home Language"], ["equitableTreatment", "Equitable Treatment"], ["engagementAtProficiencyLevel", "Engagement"], ["partnerWithStudentsAndFamilies", "Partnership"]].map(([k, l]) => {
-                const v = inputs.paso5[k];
+              <h4>Paso 5 — Practice of Knowing Learners, Families & Communities</h4>
+              {PASO5_FIELDS.map((f) => {
+                const v = inputs.paso5[f.key];
                 if (!v) return null;
-                return <div key={k} className="lp-inputs__field"><strong>{l}:</strong> {v}</div>;
+                return <div key={f.key} className="lp-inputs__field"><strong>{f.label}:</strong> {v}</div>;
+              })}
+            </div>
+          )}
+
+          {inputs.paso6 && (
+            <div className="lp-inputs__section">
+              <h4>Paso 6 — Practice of Advocacy</h4>
+              {PASO6_ADVOCACY_FIELDS.map((f) => {
+                const v = inputs.paso6[f.key];
+                if (!v) return null;
+                return <div key={f.key} className="lp-inputs__field"><strong>{f.label}:</strong> {v}</div>;
               })}
             </div>
           )}
@@ -907,7 +1316,7 @@ function DashboardHome({ user, cycle, pasoStatuses, onNavigate, savedPlans }) {
                   {statusLabel}
                 </span>
                 <h3 className="pathway-card__title">{p.label}: {p.name}</h3>
-                <p className="pathway-card__desc">{p.section === "pre" ? "Pre-Conference" : "Post-Conference"}</p>
+                <p className="pathway-card__desc">{p.name}</p>
                 <div className="pathway-card__footer">
                   <span className="pathway-card__action">
                     {status === "completed" ? "Review →" : status === "draft" ? "Continue →" : "Start →"}
@@ -1114,9 +1523,13 @@ function TeacherDashboard({ user, onLogout }) {
       const key = `paso${num}`;
       let d;
       if (num === 2) {
-        d = res.submissions ? { students: res.students, submissions: res.submissions } : res[key] || res.paso || res.data || res;
+        d = res.submissions ? { students: res.students, submissions: res.submissions, paso2General: res.paso2General } : res[key] || res.paso || res.data || res;
         d = d || {};
         if (d.submissions && d.submissions.length > 0 && d.notes === undefined) d.notes = d.submissions[0].notes || "";
+      } else if (num === 3) {
+        d = { ...(res[key] || res.paso || res.data || res || {}), paso3General: res.paso3General };
+      } else if (num === 4) {
+        d = { ...(res[key] || res.paso || res.data || res || {}), paso4General: res.paso4General };
       } else {
         d = res[key] || res.paso || res.data || res || {};
       }
@@ -1350,8 +1763,8 @@ function TeacherDashboard({ user, onLogout }) {
     switch (num) {
       case 1: return <section className="dashboard-content"><Paso1Form data={d} onChange={handleChange} onSave={handleSave} saving={pasoSaving} /></section>;
       case 2: return <section className="dashboard-content"><Paso2Form cycleId={cycle._id || cycle.id} data={d} onChange={handleChange} onSave={handleSave} saving={pasoSaving} /></section>;
-      case 3: return <section className="dashboard-content"><Paso3Form data={d} onChange={handleChange} onSave={handleSave} saving={pasoSaving} /></section>;
-      case 4: return <section className="dashboard-content"><Paso4Form data={d} onChange={handleChange} onSave={handleSave} saving={pasoSaving} /></section>;
+      case 3: return <section className="dashboard-content"><Paso3Form cycleId={cycle._id || cycle.id} data={d} onChange={handleChange} onSave={handleSave} saving={pasoSaving} /></section>;
+      case 4: return <section className="dashboard-content"><Paso4Form cycleId={cycle._id || cycle.id} data={d} onChange={handleChange} onSave={handleSave} saving={pasoSaving} /></section>;
       case 5: return <section className="dashboard-content"><Paso5Form data={d} onChange={handleChange} onSave={handleSave} saving={pasoSaving} /></section>;
       case 6: return <section className="dashboard-content"><Paso6Form data={d} onChange={handleChange} onSave={handleSave} saving={pasoSaving} /></section>;
       default: return null;
@@ -1384,34 +1797,8 @@ function TeacherDashboard({ user, onLogout }) {
             <span className="paso-nav-item__label">Dashboard</span>
           </button>
 
-          <h3 className="dashboard-sidebar__section-title">PRE CONFERENCE</h3>
           <ul className="journey-steps">
-            {PASO_META.filter((p) => p.section === "pre").map((p) => {
-              const status = pasoStatuses[p.num] || "pending";
-              const statusClass = status === "completed" ? "completed" : status === "draft" ? "in_progress" : "locked";
-              const isActive = view === `paso${p.num}`;
-              return (
-                <li
-                  key={p.num}
-                  className={`journey-step journey-step--${statusClass} ${isActive ? "journey-step--active" : ""}`}
-                  onClick={() => navigateTo(`paso${p.num}`)}
-                  style={{ cursor: "pointer" }}
-                >
-                  <span className="journey-step__num">{status === "completed" ? "✓" : p.num}</span>
-                  <div className="journey-step__content">
-                    <span className="journey-step__name">{p.name}</span>
-                    <span className="journey-step__status">
-                      {status === "completed" ? "Completed" : status === "draft" ? "In Progress" : "Not Started"}
-                    </span>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-
-          <h3 className="dashboard-sidebar__section-title" style={{ marginTop: 16 }}>POST CONFERENCE</h3>
-          <ul className="journey-steps">
-            {PASO_META.filter((p) => p.section === "post").map((p) => {
+            {PASO_META.map((p) => {
               const status = pasoStatuses[p.num] || "pending";
               const statusClass = status === "completed" ? "completed" : status === "draft" ? "in_progress" : "locked";
               const isActive = view === `paso${p.num}`;

@@ -28,10 +28,10 @@ const EMPTY_USER_FORM = {
 
 const PASO_LABELS = {
   paso1: "Paso 1 — Knowledge of Self",
-  paso2: "Paso 2 — Student Profile",
-  paso3: "Paso 3 — Preliminary Plan",
-  paso4: "Paso 4 — District Guidelines",
-  paso5: "Paso 5 — Partner with Families",
+  paso2: "Paso 2 — Knowledge of Learner/Student Profile",
+  paso3: "Paso 3 — Practice of Teaching/Preliminary Lesson Plan",
+  paso4: "Paso 4 — Knowledge of Sociopolitical Dynamics",
+  paso5: "Paso 5 — Practice of Knowing Learners, Families & Communities",
   paso6: "Paso 6 — Practice of Advocacy",
 };
 
