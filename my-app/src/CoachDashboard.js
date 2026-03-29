@@ -14,11 +14,12 @@ const VIEWS = {
   MY_EVALS: "my_evals",
 };
 
-const TOOLS = [
-  { name: "Teacher Efficacy Survey", icon: "☑" },
-  { name: "Knowledge of Learner/Student Profile", icon: "👤" },
-  { name: "AI Lesson Plan", icon: "💼" },
-];
+/** `User.toPublic()` exposes Mongo id as `id`; older payloads may use `_id`. */
+function publicUserId(user) {
+  if (!user) return "";
+  const v = user._id ?? user.id;
+  return v != null ? String(v) : "";
+}
 
 const STATS_TEMPLATE = [
   { key: "pending", label: "PENDING SURVEYS", icon: "📊", fallback: "0" },
@@ -119,7 +120,8 @@ const PASO6_ADVOCACY_FIELDS = [
 ];
 
 function statusPill(status) {
-  if (!status) return null;
+  if (status == null || status === "") return null;
+  const label = String(status).replace(/_/g, " ");
   const colors = {
     completed: { bg: "var(--accent-light)", color: "var(--accent-hover)" },
     draft: { bg: "#fef3c7", color: "#92400e" },
@@ -127,14 +129,14 @@ function statusPill(status) {
     generated: { bg: "var(--accent-light)", color: "var(--accent-hover)" },
     finalized: { bg: "var(--accent-light)", color: "var(--accent-hover)" },
   };
-  const c = colors[status] || colors.draft;
+  const c = colors[status] || colors[String(status)] || colors.draft;
   return (
     <span style={{
       display: "inline-block", fontSize: ".7rem", fontWeight: 700,
       letterSpacing: ".04em", padding: "3px 8px", borderRadius: 6,
       background: c.bg, color: c.color, textTransform: "uppercase",
     }}>
-      {status.replace(/_/g, " ")}
+      {label}
     </span>
   );
 }
@@ -170,7 +172,28 @@ function ErrorBanner({ message, onRetry }) {
   );
 }
 
+function coerceFieldText(value) {
+  if (value == null || value === "") return "";
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+  if (typeof value === "object") {
+    if (Array.isArray(value)) {
+      return value
+        .map((v) => (v != null && typeof v === "object" ? JSON.stringify(v) : String(v)))
+        .join("\n");
+    }
+    try {
+      return JSON.stringify(value, null, 2);
+    } catch {
+      return "[Unable to display value]";
+    }
+  }
+  return String(value);
+}
+
 function DataField({ label, value }) {
+  const text = coerceFieldText(value);
   return (
     <div style={{ marginBottom: 12 }}>
       <div style={{ fontSize: ".78rem", fontWeight: 700, color: "var(--muted)", letterSpacing: ".03em", marginBottom: 4 }}>
@@ -181,9 +204,331 @@ function DataField({ label, value }) {
         padding: "10px 14px", fontSize: ".9rem", color: "var(--text)", lineHeight: 1.55,
         whiteSpace: "pre-wrap", minHeight: 38,
       }}>
-        {value || <span style={{ color: "var(--muted)", fontStyle: "italic" }}>No response</span>}
+        {text ? text : <span style={{ color: "var(--muted)", fontStyle: "italic" }}>No response</span>}
       </div>
     </div>
+  );
+}
+
+function phaseLabel(stage) {
+  const m = { pre: "Pre-conference", observation: "Observation", post: "Post-conference" };
+  return m[stage] || stage || "—";
+}
+
+function lessonPlanDisplayTitle(plan) {
+  const t = plan?.paso1to5Input?.paso3?.lessonTitle;
+  if (t && String(t).trim()) return String(t).trim();
+  const sub = plan?.paso1to5Input?.paso3?.subjectArea;
+  if (sub && String(sub).trim()) return String(sub).trim();
+  return "Lesson plan";
+}
+
+function lessonPlanSnapshotBundle(plan) {
+  const input = plan?.paso1to5Input;
+  if (!input || typeof input !== "object") return null;
+  return {
+    stage: input.stage || plan?.stage,
+    paso1: input.paso1,
+    paso2General: input.paso2General,
+    paso2Students: input.paso2Students,
+    paso3General: input.paso3General,
+    paso3: input.paso3,
+    paso4General: input.paso4General,
+    paso4: input.paso4,
+    paso5: input.paso5,
+    paso6: input.paso6,
+  };
+}
+
+function bundleHasPasoAnswers(bundle) {
+  if (!bundle) return false;
+  if (bundle.paso1 || bundle.paso2General || bundle.paso3General || bundle.paso3
+    || bundle.paso4General || bundle.paso4 || bundle.paso5 || bundle.paso6) {
+    return true;
+  }
+  const rows = bundle.paso2Students || [];
+  return rows.some((r) => r?.submission);
+}
+
+/** Prefer snapshot on the lesson plan; otherwise live Paso bundle for that plan’s stage (drafts / ongoing work). */
+function coachBundleForPlan(plan, pasosByStage) {
+  const snap = lessonPlanSnapshotBundle(plan);
+  if (snap && bundleHasPasoAnswers(snap)) return { bundle: snap, source: "snapshot" };
+  const st = plan?.stage || "pre";
+  const live = pasosByStage?.[st];
+  if (live && bundleHasPasoAnswers(live)) return { bundle: live, source: "live" };
+  return { bundle: null, source: null };
+}
+
+function sortPlansByUpdatedDesc(list) {
+  return [...list].sort((a, b) => {
+    const ta = a?.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+    const tb = b?.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+    return tb - ta;
+  });
+}
+
+/** One lesson plan row: generated text + Paso Q&A (snapshot or live for that stage). */
+function CoachLessonPlanExpandable({ plan, pasosByStage, showLatestBadge }) {
+  const { bundle, source } = coachBundleForPlan(plan, pasosByStage);
+  const caption = source === "snapshot"
+    ? "Paso questions and responses saved with this lesson plan when it was generated."
+    : source === "live"
+      ? "Current Paso responses for this plan’s stage. A full snapshot is stored when the teacher generates the plan."
+      : null;
+  const isDraft = plan.status === "draft";
+
+  return (
+    <details
+      style={{
+        background: "#f8fafc", border: "1px solid var(--border)", borderRadius: 12, padding: "10px 14px",
+      }}
+    >
+      <summary style={{ cursor: "pointer", fontWeight: 700, fontSize: ".9rem", color: "var(--text)", lineHeight: 1.5 }}>
+        {lessonPlanDisplayTitle(plan)}
+        {showLatestBadge && (
+          <span style={{
+            marginLeft: 8, fontSize: ".65rem", fontWeight: 700, textTransform: "uppercase",
+            padding: "2px 6px", borderRadius: 4, background: "var(--accent-light)", color: "var(--accent-hover)",
+          }}>
+            Latest
+          </span>
+        )}
+        {isDraft && (
+          <span style={{
+            marginLeft: 8, fontSize: ".65rem", fontWeight: 700, textTransform: "uppercase",
+            padding: "2px 6px", borderRadius: 4, background: "#fef3c7", color: "#92400e",
+          }}>
+            In progress
+          </span>
+        )}
+        <span style={{ marginLeft: 8, fontWeight: 400, fontSize: ".78rem", color: "var(--muted)" }}>
+          {phaseLabel(plan.stage)} · {plan.updatedAt ? new Date(plan.updatedAt).toLocaleString() : ""}
+        </span>
+        <span style={{ marginLeft: 8 }}>{statusPill(plan.status)}</span>
+      </summary>
+      <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid var(--border)" }}>
+        <div style={{ fontWeight: 700, fontSize: ".85rem", marginBottom: 8, color: "var(--text)" }}>
+          Lesson plan text
+          {isDraft && !plan.content?.trim?.() && (
+            <span style={{ fontWeight: 400, color: "var(--muted)", marginLeft: 6 }}>(not generated yet)</span>
+          )}
+        </div>
+        <div style={{
+          background: "#fff", border: "1px solid var(--border)", borderRadius: 10,
+          padding: 14, whiteSpace: "pre-wrap", fontSize: ".88rem", lineHeight: 1.6,
+          maxHeight: 380, overflowY: "auto", marginBottom: 8,
+        }}>
+          {plan.content?.trim?.()
+            ? plan.content
+            : <span style={{ color: "var(--muted)", fontStyle: "italic" }}>No AI lesson text for this record yet.</span>}
+        </div>
+
+        <div style={{ fontWeight: 700, fontSize: ".85rem", margin: "18px 0 8px", color: "var(--text)" }}>
+          Paso questions & responses (with this plan)
+        </div>
+        {bundle ? (
+          <StagePasoBundleReadOnly
+            phaseTitle={`${phaseLabel(plan.stage)} — Paso 1–6`}
+            bundle={bundle}
+            caption={caption}
+          />
+        ) : (
+          <p style={{ color: "var(--muted)", fontStyle: "italic", margin: 0 }}>
+            No Paso responses to show for this plan yet. The teacher may not have started this stage.
+          </p>
+        )}
+      </div>
+    </details>
+  );
+}
+
+/** Read-only Paso 1–6 for one stage bundle (from API pasosByStage or lesson plan snapshot). */
+function StagePasoBundleReadOnly({ phaseTitle, bundle, caption }) {
+  if (!bundle) {
+    return (
+      <section className="coach-activity" style={{ padding: 20 }}>
+        <h3 style={{ margin: "0 0 8px", fontSize: "1.05rem", fontWeight: 700, color: "var(--accent-hover)" }}>
+          {phaseTitle}
+        </h3>
+        <p style={{ color: "var(--muted)", fontStyle: "italic", margin: 0 }}>No data for this phase.</p>
+      </section>
+    );
+  }
+
+  const {
+    paso1, paso2General, paso2Students, paso3General, paso3, paso4General, paso4, paso5, paso6,
+  } = bundle;
+  const p2Rows = Array.isArray(paso2Students)
+    ? paso2Students.filter((r) => r != null && typeof r === "object")
+    : [];
+
+  return (
+    <section className="coach-activity" style={{ padding: 20 }}>
+      <h3 style={{ margin: "0 0 4px", fontSize: "1.05rem", fontWeight: 700, color: "var(--accent-hover)" }}>
+        {phaseTitle}
+      </h3>
+      <div style={{ fontSize: ".8rem", color: "var(--muted)", marginBottom: caption ? 8 : 14 }}>
+        Stage: {phaseLabel(bundle.stage)}
+      </div>
+      {caption && (
+        <p style={{
+          fontSize: ".82rem", color: "var(--muted)", margin: "0 0 14px", lineHeight: 1.45,
+        }}>
+          {caption}
+        </p>
+      )}
+
+      <h4 style={{ margin: "16px 0 8px", fontSize: ".95rem", fontWeight: 700, color: "var(--text)" }}>
+        Paso 1 — Teacher Efficacy Survey
+      </h4>
+      <div style={{ fontSize: ".8rem", color: "var(--muted)", marginBottom: 10 }}>
+        {paso1 ? <>{statusPill(paso1.status)} <span style={{ marginLeft: 6 }}>Updated {paso1.updatedAt ? new Date(paso1.updatedAt).toLocaleDateString() : ""}</span></> : "Not submitted"}
+      </div>
+      {paso1 ? (
+        PASO1_FIELDS.map((f) => (
+          <DataField key={f.key} label={f.label} value={paso1[f.key]?.response} />
+        ))
+      ) : (
+        <p style={{ color: "var(--muted)", fontStyle: "italic" }}>No Paso 1 data.</p>
+      )}
+
+      <h4 style={{ margin: "20px 0 8px", fontSize: ".95rem", fontWeight: 700, color: "var(--text)" }}>
+        Paso 2 — Section 1: General Questions
+      </h4>
+      <div style={{ fontSize: ".8rem", color: "var(--muted)", marginBottom: 10 }}>
+        {paso2General ? <>{statusPill(paso2General.status)} <span style={{ marginLeft: 6 }}>Updated {paso2General.updatedAt ? new Date(paso2General.updatedAt).toLocaleDateString() : ""}</span></> : "Not submitted"}
+      </div>
+      {paso2General ? (
+        PASO2_GENERAL_FIELDS.map((f) => (
+          <DataField key={f.key} label={f.label} value={paso2General[f.key]?.response} />
+        ))
+      ) : (
+        <p style={{ color: "var(--muted)", fontStyle: "italic" }}>No general questions data.</p>
+      )}
+
+      <h4 style={{ margin: "20px 0 8px", fontSize: ".95rem", fontWeight: 700, color: "var(--text)" }}>
+        Paso 2 — Section 2: Student Profiles
+      </h4>
+      <div style={{ fontSize: ".8rem", color: "var(--muted)", marginBottom: 10 }}>
+        {p2Rows.length > 0 ? `${p2Rows.filter((r) => r.submission).length} profile(s) submitted` : "No roster rows"}
+      </div>
+      {p2Rows.length > 0 ? (
+        p2Rows.map((row, idx) => {
+          const s = row.student;
+          const p = row.submission;
+          const name = s ? `${s.firstName || ""} ${s.lastName || ""}`.trim() : `Student ${idx + 1}`;
+          return (
+            <div key={s?._id || idx} style={{
+              background: "#f8fafc", border: "1px solid var(--border)",
+              borderRadius: 12, padding: 16, marginBottom: 12,
+            }}>
+              <div style={{ fontWeight: 700, fontSize: ".9rem", marginBottom: 10, color: "var(--text)" }}>
+                {name || `Profile ${idx + 1}`}
+                {p && <span style={{ marginLeft: 8 }}>{statusPill(p.status)}</span>}
+              </div>
+              {p ? (
+                <>
+                  <DataField label="Knowledge of Other" value={p.knowledgeOfOther} />
+                  <DataField label="Learning Goals" value={p.learningGoals} />
+                  <DataField label="Support Needs" value={p.supportNeeds} />
+                  <DataField label="Assessment" value={p.assessment} />
+                  <DataField label="Final Review" value={p.finalReview} />
+                </>
+              ) : (
+                <p style={{ color: "var(--muted)", fontStyle: "italic", margin: 0 }}>No student profile submitted.</p>
+              )}
+            </div>
+          );
+        })
+      ) : (
+        <p style={{ color: "var(--muted)", fontStyle: "italic" }}>No student profile data.</p>
+      )}
+
+      <h4 style={{ margin: "20px 0 8px", fontSize: ".95rem", fontWeight: 700, color: "var(--text)" }}>
+        Paso 3 — Section 1: General Questions
+      </h4>
+      <div style={{ fontSize: ".8rem", color: "var(--muted)", marginBottom: 10 }}>
+        {paso3General ? <>{statusPill(paso3General.status)} <span style={{ marginLeft: 6 }}>Updated {paso3General.updatedAt ? new Date(paso3General.updatedAt).toLocaleDateString() : ""}</span></> : "Not submitted"}
+      </div>
+      {paso3General ? (
+        PASO3_GENERAL_FIELDS.map((f) => (
+          <DataField key={f.key} label={f.label} value={paso3General[f.key]?.response} />
+        ))
+      ) : (
+        <p style={{ color: "var(--muted)", fontStyle: "italic" }}>No general questions data.</p>
+      )}
+
+      <h4 style={{ margin: "20px 0 8px", fontSize: ".95rem", fontWeight: 700, color: "var(--text)" }}>
+        Paso 3 — Section 2: Preliminary Lesson Plan
+      </h4>
+      <div style={{ fontSize: ".8rem", color: "var(--muted)", marginBottom: 10 }}>
+        {paso3 ? <>{statusPill(paso3.status)} <span style={{ marginLeft: 6 }}>Updated {paso3.updatedAt ? new Date(paso3.updatedAt).toLocaleDateString() : ""}</span></> : "Not submitted"}
+      </div>
+      {paso3 ? (
+        PASO3_FIELDS.map((f) => (
+          <DataField key={f.key} label={f.label} value={paso3[f.key]} />
+        ))
+      ) : (
+        <p style={{ color: "var(--muted)", fontStyle: "italic" }}>No preliminary plan data.</p>
+      )}
+
+      <h4 style={{ margin: "20px 0 8px", fontSize: ".95rem", fontWeight: 700, color: "var(--text)" }}>
+        Paso 4 — Section 1: General Questions
+      </h4>
+      <div style={{ fontSize: ".8rem", color: "var(--muted)", marginBottom: 10 }}>
+        {paso4General ? <>{statusPill(paso4General.status)} <span style={{ marginLeft: 6 }}>Updated {paso4General.updatedAt ? new Date(paso4General.updatedAt).toLocaleDateString() : ""}</span></> : "Not submitted"}
+      </div>
+      {paso4General ? (
+        PASO4_GENERAL_FIELDS.map((f) => (
+          <DataField key={f.key} label={f.label} value={paso4General[f.key]?.response} />
+        ))
+      ) : (
+        <p style={{ color: "var(--muted)", fontStyle: "italic" }}>No general questions data.</p>
+      )}
+
+      <h4 style={{ margin: "20px 0 8px", fontSize: ".95rem", fontWeight: 700, color: "var(--text)" }}>
+        Paso 4 — Section 2: District Guidelines
+      </h4>
+      <div style={{ fontSize: ".8rem", color: "var(--muted)", marginBottom: 10 }}>
+        {paso4 ? <>{statusPill(paso4.status)} <span style={{ marginLeft: 6 }}>Updated {paso4.updatedAt ? new Date(paso4.updatedAt).toLocaleDateString() : ""}</span></> : "Not submitted"}
+      </div>
+      {paso4 ? (
+        PASO4_FIELDS.map((f) => (
+          <DataField key={f.key} label={f.label} value={paso4[f.key]} />
+        ))
+      ) : (
+        <p style={{ color: "var(--muted)", fontStyle: "italic" }}>No district guidelines data.</p>
+      )}
+
+      <h4 style={{ margin: "20px 0 8px", fontSize: ".95rem", fontWeight: 700, color: "var(--text)" }}>
+        Paso 5 — Knowing Learners, Families & Communities
+      </h4>
+      <div style={{ fontSize: ".8rem", color: "var(--muted)", marginBottom: 10 }}>
+        {paso5 ? <>{statusPill(paso5.status)} <span style={{ marginLeft: 6 }}>Updated {paso5.updatedAt ? new Date(paso5.updatedAt).toLocaleDateString() : ""}</span></> : "Not submitted"}
+      </div>
+      {paso5 ? (
+        PASO5_FIELDS.map((f) => (
+          <DataField key={f.key} label={f.label} value={paso5[f.key]} />
+        ))
+      ) : (
+        <p style={{ color: "var(--muted)", fontStyle: "italic" }}>No Paso 5 data.</p>
+      )}
+
+      <h4 style={{ margin: "20px 0 8px", fontSize: ".95rem", fontWeight: 700, color: "var(--text)" }}>
+        Paso 6 — Practice of Advocacy
+      </h4>
+      <div style={{ fontSize: ".8rem", color: "var(--muted)", marginBottom: 10 }}>
+        {paso6 ? <>{statusPill(paso6.status)} <span style={{ marginLeft: 6 }}>Updated {paso6.updatedAt ? new Date(paso6.updatedAt).toLocaleDateString() : ""}</span></> : "Not submitted"}
+      </div>
+      {paso6 ? (
+        PASO6_ADVOCACY_FIELDS.map((f) => (
+          <DataField key={f.key} label={f.label} value={paso6[f.key]} />
+        ))
+      ) : (
+        <p style={{ color: "var(--muted)", fontStyle: "italic" }}>No Paso 6 data.</p>
+      )}
+    </section>
   );
 }
 
@@ -300,7 +645,7 @@ function TeacherListView({ teachers, loading, error, onRetry, onSelectTeacher })
           All Teachers
         </h2>
         <p style={{ margin: 0, fontSize: ".9rem", color: "var(--muted)" }}>
-          {teachers.length} teacher(s) in your roster. Click a teacher to view their full profile and Paso data.
+          {teachers.length} teacher(s) in your roster. Click a teacher to view lesson plans, Paso responses, and roster (read-only).
         </p>
       </div>
 
@@ -312,9 +657,9 @@ function TeacherListView({ teachers, loading, error, onRetry, onSelectTeacher })
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {teachers.map(({ teacher, latestCycle, hasLessonPlan }) => (
             <button
-              key={teacher._id}
+              key={publicUserId(teacher)}
               type="button"
-              onClick={() => onSelectTeacher(teacher._id)}
+              onClick={() => onSelectTeacher(publicUserId(teacher))}
               style={{
                 display: "flex", alignItems: "center", gap: 16,
                 padding: "16px 20px", background: "var(--panel)",
@@ -381,8 +726,18 @@ function TeacherDetailView({ teacherId, onBack, onStartEval }) {
   if (loading) return <LoadingSpinner />;
   if (error) return <ErrorBanner message={error} onRetry={load} />;
   if (!data) return null;
+  if (!data.teacher) {
+    return <ErrorBanner message="Could not load this teacher’s profile." onRetry={load} />;
+  }
 
-  const { teacher, cycle, paso1, paso2General, paso2, paso3General, paso3, paso4General, paso4, paso5, paso6, students, lessonPlan } = data;
+  const {
+    teacher, cycle, students, lessonPlan, lessonPlans = [], pasosByStage,
+  } = data;
+  const plans = Array.isArray(lessonPlans) ? lessonPlans : [];
+  const latestPlan = lessonPlan || sortPlansByUpdatedDesc(plans)[0] || null;
+  const latestPlanId = latestPlan?._id;
+  const drafts = sortPlansByUpdatedDesc(plans.filter((p) => p.status === "draft"));
+  const completed = sortPlansByUpdatedDesc(plans.filter((p) => p.status !== "draft"));
 
   return (
     <div>
@@ -403,9 +758,9 @@ function TeacherDetailView({ teacherId, onBack, onStartEval }) {
           <span style={{ color: "var(--muted)", fontSize: ".9rem" }}>{teacher.email}</span>
         </div>
         {cycle && statusPill(cycle.status)}
-        {lessonPlan && (
+        {latestPlan && (
           <button type="button" className="btn btn--resume" style={{ fontSize: ".82rem", padding: "8px 14px" }}
-            onClick={() => onStartEval(teacher._id, lessonPlan._id)}>
+            onClick={() => onStartEval(publicUserId(teacher), latestPlan._id)}>
             + Evaluate
           </button>
         )}
@@ -419,176 +774,112 @@ function TeacherDetailView({ teacherId, onBack, onStartEval }) {
 
       {cycle && (
         <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-          {/* PASO 1 */}
           <section className="coach-activity" style={{ padding: 20 }}>
-            <h3 style={{ margin: "0 0 4px", fontSize: "1.05rem", fontWeight: 700, color: "var(--accent-hover)" }}>
-              Paso 1 — Teacher Efficacy Survey
+            <h3 style={{ margin: "0 0 8px", fontSize: "1.05rem", fontWeight: 700, color: "var(--accent-hover)" }}>
+              Lesson plans & Paso responses
             </h3>
-            <div style={{ fontSize: ".8rem", color: "var(--muted)", marginBottom: 14 }}>
-              {paso1 ? <>{statusPill(paso1.status)} <span style={{ marginLeft: 6 }}>Submitted {paso1.updatedAt ? new Date(paso1.updatedAt).toLocaleDateString() : ""}</span></> : "Not submitted"}
-            </div>
-            {paso1 ? (
-              PASO1_FIELDS.map((f) => (
-                <DataField key={f.key} label={f.label} value={paso1[f.key]?.response} />
-              ))
-            ) : (
-              <p style={{ color: "var(--muted)", fontStyle: "italic" }}>No Paso 1 data available.</p>
-            )}
-          </section>
+            <p style={{ margin: "0 0 16px", fontSize: ".85rem", color: "var(--muted)", lineHeight: 1.5 }}>
+              Each row is one lesson plan for this cycle—expand it to see the <strong>AI lesson text</strong> and the{" "}
+              <strong>Paso questions and answers</strong> tied to that plan. <strong>In progress</strong> means draft; generated or
+              finalized rows use the Paso snapshot from when the plan was produced. If no snapshot exists yet, you see the{" "}
+              <strong>current</strong> Paso answers for that plan’s stage (ongoing work).
+            </p>
 
-          {/* PASO 2 — Section 1: General Questions */}
-          <section className="coach-activity" style={{ padding: 20 }}>
-            <h3 style={{ margin: "0 0 4px", fontSize: "1.05rem", fontWeight: 700, color: "var(--accent-hover)" }}>
-              Paso 2 — Section 1: General Questions
-            </h3>
-            <div style={{ fontSize: ".8rem", color: "var(--muted)", marginBottom: 14 }}>
-              {paso2General ? <>{statusPill(paso2General.status)} <span style={{ marginLeft: 6 }}>Submitted {paso2General.updatedAt ? new Date(paso2General.updatedAt).toLocaleDateString() : ""}</span></> : "Not submitted"}
-            </div>
-            {paso2General ? (
-              PASO2_GENERAL_FIELDS.map((f) => (
-                <DataField key={f.key} label={f.label} value={paso2General[f.key]?.response} />
-              ))
+            {plans.length === 0 ? (
+              <p style={{ color: "var(--muted)", fontStyle: "italic", margin: "0 0 16px" }}>
+                No lesson plan documents for this cycle yet. Paso work by stage is shown below.
+              </p>
             ) : (
-              <p style={{ color: "var(--muted)", fontStyle: "italic" }}>No general questions data available.</p>
-            )}
-          </section>
-
-          {/* PASO 2 — Section 2: Student Profiles */}
-          <section className="coach-activity" style={{ padding: 20 }}>
-            <h3 style={{ margin: "0 0 4px", fontSize: "1.05rem", fontWeight: 700, color: "var(--accent-hover)" }}>
-              Paso 2 — Section 2: Student Profiles
-            </h3>
-            <div style={{ fontSize: ".8rem", color: "var(--muted)", marginBottom: 14 }}>
-              {paso2 && paso2.length > 0 ? `${paso2.length} student profile(s)` : "No student profiles submitted"}
-            </div>
-            {paso2 && paso2.length > 0 ? (
-              paso2.map((p, idx) => {
-                const student = students?.find((s) => s._id === p.studentId) || null;
-                return (
-                  <div key={p._id || idx} style={{
-                    background: "#f8fafc", border: "1px solid var(--border)",
-                    borderRadius: 12, padding: 16, marginBottom: 12,
-                  }}>
-                    <div style={{ fontWeight: 700, fontSize: ".9rem", marginBottom: 10, color: "var(--text)" }}>
-                      Student: {student ? `${student.firstName} ${student.lastName}` : `Profile ${idx + 1}`}
-                      <span style={{ marginLeft: 8 }}>{statusPill(p.status)}</span>
+              <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+                {drafts.length > 0 && (
+                  <div>
+                    <h4 style={{ margin: "0 0 10px", fontSize: ".95rem", fontWeight: 700, color: "var(--text)" }}>
+                      In progress (draft)
+                    </h4>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                      {drafts.map((plan) => (
+                        <CoachLessonPlanExpandable
+                          key={plan._id}
+                          plan={plan}
+                          pasosByStage={pasosByStage}
+                          showLatestBadge={String(plan._id) === String(latestPlanId)}
+                        />
+                      ))}
                     </div>
-                    <DataField label="Knowledge of Other" value={p.knowledgeOfOther} />
-                    <DataField label="Learning Goals" value={p.learningGoals} />
-                    <DataField label="Support Needs" value={p.supportNeeds} />
-                    <DataField label="Assessment" value={p.assessment} />
-                    <DataField label="Final Review" value={p.finalReview} />
                   </div>
-                );
-              })
-            ) : (
-              <p style={{ color: "var(--muted)", fontStyle: "italic" }}>No student profile data available.</p>
+                )}
+                {completed.length > 0 && (
+                  <div>
+                    <h4 style={{ margin: "0 0 10px", fontSize: ".95rem", fontWeight: 700, color: "var(--text)" }}>
+                      Generated & finalized
+                    </h4>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                      {completed.map((plan) => (
+                        <CoachLessonPlanExpandable
+                          key={plan._id}
+                          plan={plan}
+                          pasosByStage={pasosByStage}
+                          showLatestBadge={String(plan._id) === String(latestPlanId)}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
           </section>
 
-          {/* PASO 3 — Section 1: General Questions */}
-          <section className="coach-activity" style={{ padding: 20 }}>
-            <h3 style={{ margin: "0 0 4px", fontSize: "1.05rem", fontWeight: 700, color: "var(--accent-hover)" }}>
-              Paso 3 — Section 1: General Questions
-            </h3>
-            <div style={{ fontSize: ".8rem", color: "var(--muted)", marginBottom: 14 }}>
-              {paso3General ? <>{statusPill(paso3General.status)} <span style={{ marginLeft: 6 }}>Submitted {paso3General.updatedAt ? new Date(paso3General.updatedAt).toLocaleDateString() : ""}</span></> : "Not submitted"}
-            </div>
-            {paso3General ? (
-              PASO3_GENERAL_FIELDS.map((f) => (
-                <DataField key={f.key} label={f.label} value={paso3General[f.key]?.response} />
-              ))
-            ) : (
-              <p style={{ color: "var(--muted)", fontStyle: "italic" }}>No general questions data available.</p>
-            )}
-          </section>
+          {plans.length === 0 && (
+            <section className="coach-activity" style={{ padding: 20 }}>
+              <h3 style={{ margin: "0 0 8px", fontSize: "1.05rem", fontWeight: 700, color: "var(--accent-hover)" }}>
+                Current Paso work by stage
+              </h3>
+              <p style={{ margin: "0 0 14px", fontSize: ".85rem", color: "var(--muted)", lineHeight: 1.5 }}>
+                There is no lesson plan record yet; this is the teacher’s live Paso data for each conference phase (read-only).
+              </p>
+              <StagePasoBundleReadOnly
+                phaseTitle="Pre-conference"
+                bundle={pasosByStage?.pre}
+                caption="Live responses for the pre-conference stage."
+              />
+              <div style={{ height: 12 }} />
+              <StagePasoBundleReadOnly
+                phaseTitle="Observation"
+                bundle={pasosByStage?.observation}
+                caption="Live responses for the observation stage."
+              />
+              <div style={{ height: 12 }} />
+              <StagePasoBundleReadOnly
+                phaseTitle="Post-conference"
+                bundle={pasosByStage?.post}
+                caption="Live responses for the post-conference stage."
+              />
+            </section>
+          )}
 
-          {/* PASO 3 — Section 2: Preliminary Lesson Plan */}
-          <section className="coach-activity" style={{ padding: 20 }}>
-            <h3 style={{ margin: "0 0 4px", fontSize: "1.05rem", fontWeight: 700, color: "var(--accent-hover)" }}>
-              Paso 3 — Section 2: Preliminary Lesson Plan
-            </h3>
-            <div style={{ fontSize: ".8rem", color: "var(--muted)", marginBottom: 14 }}>
-              {paso3 ? <>{statusPill(paso3.status)} <span style={{ marginLeft: 6 }}>Submitted {paso3.updatedAt ? new Date(paso3.updatedAt).toLocaleDateString() : ""}</span></> : "Not submitted"}
-            </div>
-            {paso3 ? (
-              PASO3_FIELDS.map((f) => (
-                <DataField key={f.key} label={f.label} value={paso3[f.key]} />
-              ))
-            ) : (
-              <p style={{ color: "var(--muted)", fontStyle: "italic" }}>No Paso 3 preliminary plan data available.</p>
-            )}
-          </section>
+          {plans.length > 0 && (
+            <details
+              className="coach-activity"
+              style={{
+                padding: 16, borderRadius: 14, background: "var(--panel)",
+                border: "1px solid var(--border)", boxShadow: "var(--shadow)",
+              }}
+            >
+              <summary style={{ cursor: "pointer", fontWeight: 700, fontSize: ".95rem", color: "var(--text)" }}>
+                Live overview — all three stages (optional)
+              </summary>
+              <p style={{ margin: "12px 0 14px", fontSize: ".82rem", color: "var(--muted)", lineHeight: 1.45 }}>
+                Same live Paso data as the teacher’s dashboard, shown by phase. Use the lesson plan rows above to see answers
+                paired with a specific plan.
+              </p>
+              <StagePasoBundleReadOnly phaseTitle="Pre-conference (live)" bundle={pasosByStage?.pre} />
+              <div style={{ height: 12 }} />
+              <StagePasoBundleReadOnly phaseTitle="Observation (live)" bundle={pasosByStage?.observation} />
+              <div style={{ height: 12 }} />
+              <StagePasoBundleReadOnly phaseTitle="Post-conference (live)" bundle={pasosByStage?.post} />
+            </details>
+          )}
 
-          {/* PASO 4 — Section 1: General Questions */}
-          <section className="coach-activity" style={{ padding: 20 }}>
-            <h3 style={{ margin: "0 0 4px", fontSize: "1.05rem", fontWeight: 700, color: "var(--accent-hover)" }}>
-              Paso 4 — Section 1: General Questions
-            </h3>
-            <div style={{ fontSize: ".8rem", color: "var(--muted)", marginBottom: 14 }}>
-              {paso4General ? <>{statusPill(paso4General.status)} <span style={{ marginLeft: 6 }}>Submitted {paso4General.updatedAt ? new Date(paso4General.updatedAt).toLocaleDateString() : ""}</span></> : "Not submitted"}
-            </div>
-            {paso4General ? (
-              PASO4_GENERAL_FIELDS.map((f) => (
-                <DataField key={f.key} label={f.label} value={paso4General[f.key]?.response} />
-              ))
-            ) : (
-              <p style={{ color: "var(--muted)", fontStyle: "italic" }}>No general questions data available.</p>
-            )}
-          </section>
-
-          {/* PASO 4 — Section 2: District Guidelines */}
-          <section className="coach-activity" style={{ padding: 20 }}>
-            <h3 style={{ margin: "0 0 4px", fontSize: "1.05rem", fontWeight: 700, color: "var(--accent-hover)" }}>
-              Paso 4 — Section 2: District Guidelines
-            </h3>
-            <div style={{ fontSize: ".8rem", color: "var(--muted)", marginBottom: 14 }}>
-              {paso4 ? <>{statusPill(paso4.status)} <span style={{ marginLeft: 6 }}>Submitted {paso4.updatedAt ? new Date(paso4.updatedAt).toLocaleDateString() : ""}</span></> : "Not submitted"}
-            </div>
-            {paso4 ? (
-              PASO4_FIELDS.map((f) => (
-                <DataField key={f.key} label={f.label} value={paso4[f.key]} />
-              ))
-            ) : (
-              <p style={{ color: "var(--muted)", fontStyle: "italic" }}>No Paso 4 district guidelines data available.</p>
-            )}
-          </section>
-
-          {/* PASO 5 — Practice of Knowing Learners, Families & Communities */}
-          <section className="coach-activity" style={{ padding: 20 }}>
-            <h3 style={{ margin: "0 0 4px", fontSize: "1.05rem", fontWeight: 700, color: "var(--accent-hover)" }}>
-              Paso 5 — Practice of Knowing Learners, Families & Communities
-            </h3>
-            <div style={{ fontSize: ".8rem", color: "var(--muted)", marginBottom: 14 }}>
-              {paso5 ? <>{statusPill(paso5.status)} <span style={{ marginLeft: 6 }}>Submitted {paso5.updatedAt ? new Date(paso5.updatedAt).toLocaleDateString() : ""}</span></> : "Not submitted"}
-            </div>
-            {paso5 ? (
-              PASO5_FIELDS.map((f) => (
-                <DataField key={f.key} label={f.label} value={paso5[f.key]} />
-              ))
-            ) : (
-              <p style={{ color: "var(--muted)", fontStyle: "italic" }}>No Paso 5 data available.</p>
-            )}
-          </section>
-
-          {/* PASO 6 — Practice of Advocacy */}
-          <section className="coach-activity" style={{ padding: 20 }}>
-            <h3 style={{ margin: "0 0 4px", fontSize: "1.05rem", fontWeight: 700, color: "var(--accent-hover)" }}>
-              Paso 6 — Practice of Advocacy
-            </h3>
-            <div style={{ fontSize: ".8rem", color: "var(--muted)", marginBottom: 14 }}>
-              {paso6 ? <>{statusPill(paso6.status)} <span style={{ marginLeft: 6 }}>Submitted {paso6.updatedAt ? new Date(paso6.updatedAt).toLocaleDateString() : ""}</span></> : "Not submitted"}
-            </div>
-            {paso6 ? (
-              PASO6_ADVOCACY_FIELDS.map((f) => (
-                <DataField key={f.key} label={f.label} value={paso6[f.key]} />
-              ))
-            ) : (
-              <p style={{ color: "var(--muted)", fontStyle: "italic" }}>No Paso 6 data available.</p>
-            )}
-          </section>
-
-          {/* STUDENTS */}
           {students && students.length > 0 && (
             <section className="coach-activity" style={{ padding: 20 }}>
               <h3 style={{ margin: "0 0 14px", fontSize: "1.05rem", fontWeight: 700, color: "var(--accent-hover)" }}>
@@ -621,27 +912,6 @@ function TeacherDetailView({ teacherId, onBack, onStartEval }) {
               </div>
             </section>
           )}
-
-          {/* AI LESSON PLAN */}
-          {lessonPlan && (
-            <section className="coach-activity" style={{ padding: 20 }}>
-              <h3 style={{ margin: "0 0 4px", fontSize: "1.05rem", fontWeight: 700, color: "var(--accent-hover)" }}>
-                AI-Generated Lesson Plan
-              </h3>
-              <div style={{ fontSize: ".8rem", color: "var(--muted)", marginBottom: 14 }}>
-                {statusPill(lessonPlan.status)}
-                <span style={{ marginLeft: 6 }}>Generated {lessonPlan.updatedAt ? new Date(lessonPlan.updatedAt).toLocaleDateString() : ""}</span>
-              </div>
-              <div style={{
-                background: "#f8fafc", border: "1px solid var(--border)",
-                borderRadius: 12, padding: 18, whiteSpace: "pre-wrap",
-                fontSize: ".9rem", lineHeight: 1.65, color: "var(--text)",
-                maxHeight: 500, overflowY: "auto",
-              }}>
-                {lessonPlan.content || <span style={{ color: "var(--muted)", fontStyle: "italic" }}>No content generated yet.</span>}
-              </div>
-            </section>
-          )}
         </div>
       )}
     </div>
@@ -650,15 +920,55 @@ function TeacherDetailView({ teacherId, onBack, onStartEval }) {
 
 /* ─────────── CREATE EVALUATION VIEW ─────────── */
 
-function CreateEvalView({ teachers, prefillTeacherId, prefillLessonPlanId, onSuccess }) {
+function CreateEvalView({ teachers, teachersLoading, prefillTeacherId, prefillLessonPlanId, onSuccess }) {
   const [teacherId, setTeacherId] = useState(prefillTeacherId || "");
   const [lessonPlanId, setLessonPlanId] = useState(prefillLessonPlanId || "");
+  const [lessonPlansForTeacher, setLessonPlansForTeacher] = useState([]);
+  const [plansLoading, setPlansLoading] = useState(false);
+  const [plansError, setPlansError] = useState("");
   const [form, setForm] = useState({ strengths: "", areasForImprovement: "", suggestions: "", additionalNotes: "" });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
 
-  const teachersWithPlans = teachers.filter((t) => t.hasLessonPlan);
+  useEffect(() => {
+    if (!teacherId) {
+      setLessonPlansForTeacher([]);
+      setLessonPlanId("");
+      setPlansError("");
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      setPlansLoading(true);
+      setPlansError("");
+      try {
+        const data = await getTeacherDetail(teacherId);
+        if (cancelled) return;
+        const list = Array.isArray(data.lessonPlans) ? data.lessonPlans : [];
+        setLessonPlansForTeacher(list);
+        const prefillMatchesTeacher = String(prefillTeacherId || "") === String(teacherId);
+        const prefillPlanOk = prefillMatchesTeacher && prefillLessonPlanId
+          && list.some((p) => String(p._id) === String(prefillLessonPlanId));
+        if (prefillPlanOk) {
+          setLessonPlanId(String(prefillLessonPlanId));
+        } else if (list.length) {
+          setLessonPlanId(String(list[0]._id));
+        } else {
+          setLessonPlanId("");
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setPlansError(err.message || "Could not load this teacher’s lesson plans.");
+          setLessonPlansForTeacher([]);
+          setLessonPlanId("");
+        }
+      } finally {
+        if (!cancelled) setPlansLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [teacherId, prefillTeacherId, prefillLessonPlanId]);
 
   function handleChange(e) {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
@@ -667,7 +977,7 @@ function CreateEvalView({ teachers, prefillTeacherId, prefillLessonPlanId, onSuc
   async function handleSubmit(e) {
     e.preventDefault();
     if (!teacherId || !lessonPlanId) {
-      setError("Please select a teacher with a lesson plan.");
+      setError("Please select a teacher and a lesson plan to evaluate.");
       return;
     }
     setSubmitting(true);
@@ -711,27 +1021,57 @@ function CreateEvalView({ teachers, prefillTeacherId, prefillLessonPlanId, onSuc
       <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         <div className="auth-field">
           <label>Teacher</label>
+          {teachersLoading && teachers.length === 0 ? (
+            <p style={{ fontSize: ".85rem", color: "var(--muted)", margin: 0 }}>Loading teachers…</p>
+          ) : (
+            <select
+              className="auth-input"
+              value={teacherId}
+              onChange={(e) => {
+                setTeacherId(e.target.value);
+                setLessonPlanId("");
+              }}
+            >
+              <option value="">— Select a teacher —</option>
+              {teachers.map(({ teacher, hasLessonPlan }) => (
+                <option key={publicUserId(teacher)} value={publicUserId(teacher)}>
+                  {teacher.firstName} {teacher.lastName} ({teacher.email})
+                  {!hasLessonPlan ? " — no lesson plan yet" : ""}
+                </option>
+              ))}
+            </select>
+          )}
+          <span style={{ fontSize: ".78rem", color: "var(--muted)", display: "block", marginTop: 6 }}>
+            The roster reloads when you open Create Evaluation. Choose a teacher, then pick which lesson plan to evaluate.
+          </span>
+        </div>
+
+        <div className="auth-field">
+          <label>Lesson plan</label>
+          {plansLoading && (
+            <p style={{ fontSize: ".85rem", color: "var(--muted)", margin: "0 0 8px" }}>Loading lesson plans…</p>
+          )}
+          {plansError && (
+            <p style={{ fontSize: ".85rem", color: "#991b1b", margin: "0 0 8px" }}>{plansError}</p>
+          )}
           <select
             className="auth-input"
-            value={teacherId}
-            onChange={(e) => {
-              setTeacherId(e.target.value);
-              const match = teachersWithPlans.find((t) => t.teacher._id === e.target.value);
-              setLessonPlanId(match?.latestCycle?._id || "");
-            }}
+            value={lessonPlanId}
+            onChange={(e) => setLessonPlanId(e.target.value)}
+            disabled={!teacherId || plansLoading || lessonPlansForTeacher.length === 0}
           >
-            <option value="">— Select a teacher —</option>
-            {teachersWithPlans.map(({ teacher }) => (
-              <option key={teacher._id} value={teacher._id}>
-                {teacher.firstName} {teacher.lastName} ({teacher.email})
+            <option value="">
+              {teacherId && !plansLoading && lessonPlansForTeacher.length === 0
+                ? "— No lesson plans for this teacher’s current cycle —"
+                : "— Select a lesson plan —"}
+            </option>
+            {lessonPlansForTeacher.map((plan) => (
+              <option key={plan._id} value={plan._id}>
+                {lessonPlanDisplayTitle(plan)} · {phaseLabel(plan.stage)} · {plan.status}
+                {plan.updatedAt ? ` · ${new Date(plan.updatedAt).toLocaleDateString()}` : ""}
               </option>
             ))}
           </select>
-          {teachers.length > 0 && teachersWithPlans.length === 0 && (
-            <span style={{ fontSize: ".8rem", color: "#92400e" }}>
-              No teachers have a lesson plan yet.
-            </span>
-          )}
         </div>
 
         <div className="auth-field">
@@ -892,6 +1232,10 @@ function CoachDashboard({ user, onLogout }) {
 
   useEffect(() => { loadTeachers(); }, [loadTeachers]);
 
+  useEffect(() => {
+    if (view === VIEWS.CREATE_EVAL) loadTeachers();
+  }, [view, loadTeachers]);
+
   function navigate(v) {
     setView(v);
     if (v !== VIEWS.TEACHER_DETAIL) setSelectedTeacherId(null);
@@ -940,18 +1284,7 @@ function CoachDashboard({ user, onLogout }) {
         </div>
 
         <nav className="dashboard-sidebar__nav">
-          <h3 className="dashboard-sidebar__section-title">TOOLS & INSIGHTS</h3>
-          <ul className="coach-tools">
-            {TOOLS.map((t, i) => (
-              <li key={i} className="coach-tool">
-                <span className="coach-tool__icon">{t.icon}</span>
-                <span className="coach-tool__name">{t.name}</span>
-                <span className="coach-tool__eye">👁</span>
-              </li>
-            ))}
-          </ul>
-
-          <h3 className="dashboard-sidebar__section-title" style={{ marginTop: 16 }}>CORE WORKFLOW</h3>
+          <h3 className="dashboard-sidebar__section-title">CORE WORKFLOW</h3>
           <ul className="coach-tools">
             {sidebarItems.map((item) => (
               <li
@@ -1030,6 +1363,7 @@ function CoachDashboard({ user, onLogout }) {
           {view === VIEWS.CREATE_EVAL && (
             <CreateEvalView
               teachers={teachers}
+              teachersLoading={teachersLoading}
               prefillTeacherId={prefillTeacherId}
               prefillLessonPlanId={prefillLessonPlanId}
               onSuccess={() => {}}

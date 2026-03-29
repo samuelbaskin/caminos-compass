@@ -21,6 +21,12 @@ const paso3GeneralSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
+    stage: {
+      type: String,
+      enum: ["pre", "observation", "post"],
+      default: "pre",
+      index: true,
+    },
     q1_humanizingPedagogy: responseSchema,
     q2_presentLearningObjective: responseSchema,
     q3_barriers: responseSchema,
@@ -38,5 +44,7 @@ const paso3GeneralSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+paso3GeneralSchema.index({ teacherCycleId: 1, teacherId: 1, stage: 1 }, { unique: true });
 
 module.exports = mongoose.model("Paso3GeneralSubmission", paso3GeneralSchema);

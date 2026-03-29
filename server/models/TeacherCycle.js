@@ -26,6 +26,11 @@ const teacherCycleSchema = new mongoose.Schema(
       paso5: { type: String, enum: ["not_started", "in_progress", "completed"], default: "not_started" },
       paso6: { type: String, enum: ["not_started", "in_progress", "completed"], default: "not_started" },
     },
+    /** Per coaching stage (pre / observation / post): paso1..paso6 workflow status */
+    stagePasoStatuses: {
+      type: mongoose.Schema.Types.Mixed,
+      default: () => ({}),
+    },
   },
   { timestamps: true }
 );

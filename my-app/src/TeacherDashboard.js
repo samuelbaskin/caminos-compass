@@ -15,10 +15,13 @@ import {
   createStudent,
   uploadWritingSample,
   generateLessonPlan,
+  createBlankLessonPlan,
+  getCycleProgress,
   listLessonPlans,
   getLessonPlan,
   updateLessonPlan,
   deleteLessonPlan,
+  reviewPasoResponse,
 } from "./api/cycles";
 
 const PASO_META = [
@@ -30,6 +33,127 @@ const PASO_META = [
   { num: 6, label: "Paso 6", name: "Practice of Advocacy", section: "post" },
 ];
 
+const STAGE_NAV = [
+  { id: "pre", short: "Pre", label: "Pre Conference", theme: "stage-pre" },
+  { id: "observation", short: "Obs", label: "Observation", theme: "stage-observation" },
+  { id: "post", short: "Post", label: "Post Conference / Reflection", theme: "stage-post" },
+];
+
+const STAGE_LABELS = { pre: "Pre Conference", observation: "Observation", post: "Post Conference" };
+
+/* Observation phase — prompts from docs/observation-phase.md; keys match existing schema fields. */
+const PASO1_FIELDS_OBSERVATION = [
+  { key: "q1_positionality", label: "1. What aspects of your knowledge of self are you working on through this lesson?", placeholder: "Describe what you are focusing on for this lesson…" },
+  { key: "q2_hiddenCurriculum", label: "2. What evidence can be gathered about your positionality in teaching?", placeholder: "Note observable evidence related to your positionality…" },
+  { key: "q3_explicitTeaching", label: "3. What components of the lesson are informed by your knowledge of self?", placeholder: "Connect lesson design choices to your self-knowledge…" },
+];
+
+const PASO2_GENERAL_FIELDS_OBSERVATION = [
+  { key: "q1_studentReadiness", label: "1. Which students should be observed during the lesson?", placeholder: "Name or describe focus students or groups…" },
+  { key: "q2_priorKnowledge", label: "2. What data can be collected about student performance?", placeholder: "List data sources or evidence you plan to gather…" },
+  { key: "q3_retentionCheck", label: "3. How can patterns in student academic performance be investigated?", placeholder: "Describe how you will look for patterns in performance…" },
+];
+
+const PASO3_GENERAL_FIELDS_OBSERVATION = [
+  { key: "q1_humanizingPedagogy", label: "1. What should the observer focus on (student engagement, delivery, discourse, wait time)?", placeholder: "Prioritize what the observer should watch and note…" },
+  { key: "q2_presentLearningObjective", label: "2. How will student success with the learning objective be monitored?", placeholder: "Describe success indicators and how they will be tracked…" },
+  { key: "q3_barriers", label: "3. How will pacing and engagement be evaluated?", placeholder: "Explain how pacing and engagement will be assessed…" },
+];
+
+const PASO4_GENERAL_FIELDS_OBSERVATION = [
+  { key: "q1_equitableAccess", label: "1. What data will show whether students have equitable access to learning?", placeholder: "Specify evidence of equitable access…" },
+  { key: "q2_supportingEnglishLearners", label: "2. What data will show classroom power dynamics among students?", placeholder: "Describe what to look for regarding power dynamics…" },
+  { key: "q3_homeLanguageSupport", label: "3. Which groups of students should be focused on for additional support?", placeholder: "Identify students or groups needing focused observation…" },
+];
+
+const PASO5_FIELDS_OBSERVATION = [
+  { key: "q1_partnerConnect", label: "1. How can engagement levels be observed for each student or group?", placeholder: "Describe how you will observe engagement…" },
+  { key: "q2_greetStudents", label: "2. What evidence shows students connecting with the content?", placeholder: "Note signals of connection to the content…" },
+  { key: "q3_comfortableParticipate", label: "3. How can classroom relationships and rapport be observed?", placeholder: "Describe what indicates positive rapport and relationships…" },
+];
+
+const PASO6_ADVOCACY_FIELDS_OBSERVATION = [
+  { key: "q1_advocateEquity", label: "1. What evidence will show advocacy for equitable learning opportunities?", placeholder: "Describe observable advocacy for equity…" },
+  { key: "q2_scaffolding", label: "2. How can teacher talk support marginalized groups?", placeholder: "Focus on language and moves that support marginalized students…" },
+  { key: "q3_fitWithinUnit", label: "3. How can equitable participation be observed?", placeholder: "Describe what equitable participation looks like in this lesson…" },
+];
+
+/* Post-conference phase — prompts from docs/post-conference-phase.md; keys match existing schema fields. */
+const PASO1_FIELDS_POST = [
+  { key: "q1_positionality", label: "1. How did your positionality play a role in lesson delivery?", placeholder: "Reflect on how your identity and position shaped delivery…" },
+  { key: "q2_hiddenCurriculum", label: "2. What did you learn about the content through teaching this lesson?", placeholder: "Note new insights about the content from teaching it…" },
+  { key: "q3_explicitTeaching", label: "3. What did you learn about how students learn this content?", placeholder: "Describe what you learned about student learning for this content…" },
+  { key: "q4_contentKnowledge", label: "4. Where did you succeed in this lesson?", placeholder: "Identify strengths and successes from the lesson…" },
+  { key: "q5_learningProcess", label: "5. What would you adjust or do differently next time?", placeholder: "What will you change or refine for next time?" },
+];
+
+const PASO2_GENERAL_FIELDS_POST = [
+  { key: "q1_studentReadiness", label: "1. What additional information did you learn about student readiness?", placeholder: "Summarize new readiness insights from the lesson…" },
+  { key: "q2_priorKnowledge", label: "2. In what ways were students successful?", placeholder: "Describe student successes you observed…" },
+  { key: "q3_retentionCheck", label: "3. Where did students struggle or need support?", placeholder: "Note challenges and where support was needed…" },
+  { key: "q4_academicSkills", label: "4. What does the data suggest about next steps?", placeholder: "Connect evidence to instructional next steps…" },
+];
+
+const PASO3_GENERAL_FIELDS_POST = [
+  { key: "q1_humanizingPedagogy", label: "1. How did the lesson go overall?", placeholder: "Give an overall reflection on how the lesson went…" },
+  { key: "q2_presentLearningObjective", label: "2. What would you do differently next time?", placeholder: "What would you adjust in planning or delivery?" },
+  { key: "q3_barriers", label: "3. What are your next steps for improving instruction?", placeholder: "Outline concrete next steps for your practice…" },
+];
+
+const PASO4_GENERAL_FIELDS_POST = [
+  { key: "q1_equitableAccess", label: "1. Did all students have equitable access to learning?", placeholder: "Reflect on access and participation for all students…" },
+  { key: "q2_supportingEnglishLearners", label: "2. Were any groups marginalized or excluded?", placeholder: "Note any marginalization or exclusion and context…" },
+  { key: "q3_homeLanguageSupport", label: "3. How effective were strategies to support equity?", placeholder: "Evaluate strategies aimed at equitable outcomes…" },
+];
+
+const PASO5_FIELDS_POST = [
+  { key: "q1_partnerConnect", label: "1. How did you connect with students during the lesson?", placeholder: "Describe connections you made with students…" },
+  { key: "q2_greetStudents", label: "2. What additional information did you learn about students’ backgrounds?", placeholder: "Note new learning about students’ backgrounds…" },
+  { key: "q3_comfortableParticipate", label: "3. How did students use their home languages to access the content?", placeholder: "Describe home language use and access to content…" },
+  { key: "q4_teamBuilding", label: "4. How did the lesson build relationships?", placeholder: "Reflect on relationship-building during the lesson…" },
+];
+
+const PASO6_ADVOCACY_FIELDS_POST = [
+  { key: "q1_advocateEquity", label: "1. What did you learn about student learning needs?", placeholder: "Summarize learning needs that emerged…" },
+  { key: "q2_scaffolding", label: "2. How will you advocate for support for students?", placeholder: "Describe how you will advocate for needed supports…" },
+  { key: "q3_fitWithinUnit", label: "3. How will you communicate with families about learning?", placeholder: "Outline family communication plans related to learning…" },
+  { key: "q4_assessmentData", label: "4. What supports do you need moving forward?", placeholder: "Identify supports you need for yourself or your practice…" },
+];
+
+function navFromApiStatus(apiStatus) {
+  if (apiStatus === "completed") return "completed";
+  if (apiStatus === "in_progress") return "draft";
+  return "pending";
+}
+
+function cardClassFromApiStatus(apiStatus) {
+  if (apiStatus === "completed") return "completed";
+  if (apiStatus === "in_progress") return "in_progress";
+  return "locked";
+}
+
+function labelFromApiStatus(apiStatus) {
+  if (apiStatus === "completed") return "COMPLETED";
+  if (apiStatus === "in_progress") return "IN PROGRESS";
+  return "NOT STARTED";
+}
+
+function getPasoApiStatus(progressData, stageId, num) {
+  const key = `paso${num}`;
+  return progressData?.stages?.[stageId]?.pasos?.[key]?.status || "not_started";
+}
+
+function getStageAggregate(progressData, stageId) {
+  const nums = [1, 2, 3, 4, 5, 6];
+  const statuses = nums.map((n) => getPasoApiStatus(progressData, stageId, n));
+  const allDone = statuses.every((s) => s === "completed");
+  const anyStarted = statuses.some((s) => s === "in_progress" || s === "completed");
+  const nav = allDone ? "completed" : anyStarted ? "draft" : "pending";
+  const statusClass = allDone ? "completed" : anyStarted ? "in_progress" : "locked";
+  const displayStatus = allDone ? "Completed" : anyStarted ? "In Progress" : "Not Started";
+  return { nav, statusClass, displayStatus, stagePct: progressData?.stages?.[stageId]?.stagePct ?? 0 };
+}
+
 /* ─── Toast ──────────────────────────────────────────────────────────── */
 
 function Toast({ msg, type, onDone }) {
@@ -40,6 +164,109 @@ function Toast({ msg, type, onDone }) {
   return (
     <div className={`paso-toast paso-toast--${type}`}>
       {type === "success" ? "✓" : "⚠"} {msg}
+    </div>
+  );
+}
+
+/** One reflection field with AI sufficiency review (Submit + feedback pane). */
+function PasoReviewRow({
+  cycleId,
+  stage,
+  pasoNum,
+  section = "main",
+  fieldKey,
+  questionLabel,
+  value,
+  onChange,
+  placeholder,
+  rows = 4,
+  multiline = true,
+  useHeading = true,
+}) {
+  const [submitting, setSubmitting] = useState(false);
+  const [result, setResult] = useState(null);
+  const [err, setErr] = useState(null);
+
+  async function handleSubmit() {
+    if (!cycleId) {
+      setErr("Save your cycle first, then try again.");
+      return;
+    }
+    setSubmitting(true);
+    setErr(null);
+    try {
+      const r = await reviewPasoResponse(cycleId, {
+        stage,
+        pasoNum,
+        section,
+        fieldKey,
+        responseText: value,
+        questionLabel,
+      });
+      setResult(r);
+    } catch (e) {
+      setErr(e.message || "Review failed.");
+      setResult(null);
+    }
+    setSubmitting(false);
+  }
+
+  return (
+    <div className="paso-review-row">
+      <div className="paso-review-row__input-col">
+        {useHeading ? (
+          <h3 className="paso-form__section-title">{questionLabel}</h3>
+        ) : (
+          <label className="auth-label paso-review-row__label">{questionLabel}</label>
+        )}
+        <div className="paso-review-row__controls">
+          {multiline ? (
+            <textarea
+              className="auth-input paso-textarea paso-review-row__field"
+              rows={rows}
+              placeholder={placeholder}
+              value={value}
+              onChange={(e) => onChange(e.target.value)}
+            />
+          ) : (
+            <input
+              className="auth-input paso-review-row__field"
+              placeholder={placeholder}
+              value={value}
+              onChange={(e) => onChange(e.target.value)}
+            />
+          )}
+          <button
+            type="button"
+            className="btn paso-btn-sm paso-review-row__submit paso-review-row__submit--primary"
+            disabled={submitting}
+            onClick={handleSubmit}
+          >
+            {submitting ? "…" : "Submit"}
+          </button>
+        </div>
+      </div>
+      <div className="paso-review-row__pane" aria-live="polite">
+        {submitting && <p className="paso-muted">Reviewing…</p>}
+        {err && <p className="paso-review-row__error">{err}</p>}
+        {!submitting && result && (
+          <>
+            <div className="paso-review-row__score">
+              Score: <strong>{result.score}%</strong>
+              {result.score >= 75 ? <span className="paso-review-row__badge">Sufficient</span> : null}
+            </div>
+            <p className="paso-review-row__feedback">{result.feedback}</p>
+            {result.followUpQuestion ? (
+              <p className="paso-review-row__followup">
+                <strong>Follow-up:</strong> {result.followUpQuestion}
+              </p>
+            ) : null}
+          </>
+        )}
+        {!submitting && !err && !result && (
+          <p className="paso-muted paso-review-row__hint">Submit for AI feedback and score.</p>
+        )}
+      </div>
     </div>
   );
 }
@@ -59,30 +286,37 @@ const PASO1_FIELDS = [
   { key: "q10_preparedness", label: "10. Preparation and Confidence", placeholder: "What do you need to do to feel prepared and confident to teach?" },
 ];
 
-function Paso1Form({ data, onChange, onSave, saving }) {
+function Paso1Form({ data, onChange, onSave, saving, stage = "pre", cycleId }) {
+  const fields = stage === "observation" ? PASO1_FIELDS_OBSERVATION : stage === "post" ? PASO1_FIELDS_POST : PASO1_FIELDS;
   return (
-    <div className="paso-form">
+    <div className="paso-form paso-form--review">
       <div className="paso-form__header">
         <h2 className="paso-form__title">Paso 1 — Knowledge of Self</h2>
         <p className="paso-form__desc">
-          Reflect on who you are as an educator. Complete each sub-questionnaire to build your self-awareness profile.
+          {stage === "observation"
+            ? "Observation phase: focus on what the observer should know about your knowledge of self for this lesson."
+            : stage === "post"
+            ? "Post-conference: reflect on delivery, content learning, student learning, successes, and adjustments after teaching."
+            : "Reflect on who you are as an educator. Complete each sub-questionnaire to build your self-awareness profile."}
         </p>
       </div>
-      {PASO1_FIELDS.map((f) => {
+      {fields.map((f) => {
         const raw = data[f.key];
         const value = typeof raw === "object" && raw !== null && "response" in raw ? (raw.response || "") : (raw || "");
         return (
           <div key={f.key} className="paso-form__section">
-            <h3 className="paso-form__section-title">{f.label}</h3>
-            <div className="auth-field">
-              <textarea
-                className="auth-input paso-textarea"
-                rows={5}
-                placeholder={f.placeholder}
-                value={value}
-                onChange={(e) => onChange({ ...data, [f.key]: { response: e.target.value, isDraft: true } })}
-              />
-            </div>
+            <PasoReviewRow
+              cycleId={cycleId}
+              stage={stage}
+              pasoNum={1}
+              section="main"
+              fieldKey={f.key}
+              questionLabel={f.label}
+              value={value}
+              onChange={(v) => onChange({ ...data, [f.key]: { response: v, isDraft: true } })}
+              placeholder={f.placeholder}
+              rows={5}
+            />
           </div>
         );
       })}
@@ -113,7 +347,7 @@ const PASO2_GENERAL_FIELDS = [
   { key: "q10_backgroundKnowledge", label: "10. Background Knowledge", placeholder: "What background knowledge do students bring to the lesson?" },
 ];
 
-function Paso2Form({ cycleId, data, onChange, onSave, saving }) {
+function Paso2Form({ cycleId, stage = "pre", data, onChange, onSave, saving, onAfterGeneralSave }) {
   const [activeSection, setActiveSection] = useState("general");
   const [students, setStudents] = useState([]);
   const [loadingStudents, setLoadingStudents] = useState(false);
@@ -126,7 +360,6 @@ function Paso2Form({ cycleId, data, onChange, onSave, saving }) {
   const [studentError, setStudentError] = useState("");
   const [generalData, setGeneralData] = useState({});
   const [generalSaving, setGeneralSaving] = useState(false);
-  const [generalLoaded, setGeneralLoaded] = useState(false);
 
   const fetchStudents = useCallback(async () => {
     if (!cycleId) return;
@@ -141,15 +374,18 @@ function Paso2Form({ cycleId, data, onChange, onSave, saving }) {
   useEffect(() => { fetchStudents(); }, [fetchStudents]);
 
   useEffect(() => {
-    if (!cycleId || generalLoaded) return;
+    if (!cycleId) return;
+    let cancelled = false;
     (async () => {
       try {
-        const res = await getPaso2General(cycleId);
-        if (res.paso2General) setGeneralData(res.paso2General);
-      } catch { /* silent */ }
-      setGeneralLoaded(true);
+        const res = await getPaso2General(cycleId, stage);
+        if (!cancelled) setGeneralData(res.paso2General ? { ...res.paso2General } : {});
+      } catch {
+        if (!cancelled) setGeneralData({});
+      }
     })();
-  }, [cycleId, generalLoaded]);
+    return () => { cancelled = true; };
+  }, [cycleId, stage]);
 
   async function handleSaveGeneral(mode) {
     if (!cycleId) return;
@@ -157,7 +393,8 @@ function Paso2Form({ cycleId, data, onChange, onSave, saving }) {
     try {
       const status = mode === "complete" ? "completed" : "draft";
       const { _id, __v, createdAt, updatedAt, teacherCycleId, teacherId, ...clean } = generalData;
-      await savePaso2General(cycleId, { ...clean, status });
+      await savePaso2General(cycleId, { ...clean, status }, stage);
+      onAfterGeneralSave?.();
     } catch { /* silent */ }
     setGeneralSaving(false);
   }
@@ -216,8 +453,10 @@ function Paso2Form({ cycleId, data, onChange, onSave, saving }) {
     selectedStudent.llmEvaluation.includes("429")
   );
 
+  const paso2GeneralFields = stage === "observation" ? PASO2_GENERAL_FIELDS_OBSERVATION : stage === "post" ? PASO2_GENERAL_FIELDS_POST : PASO2_GENERAL_FIELDS;
+
   return (
-    <div className="paso-form">
+    <div className="paso-form paso-form--review">
       <div className="paso-form__header">
         <h2 className="paso-form__title">Paso 2 — Knowledge of Learner/Student Profile</h2>
         <p className="paso-form__desc">
@@ -257,17 +496,25 @@ function Paso2Form({ cycleId, data, onChange, onSave, saving }) {
           <div className="paso-form__section">
             <h3 className="paso-form__section-title">General Questions</h3>
             <p className="paso-form__desc" style={{ marginBottom: 16 }}>
-              Answer the following questions about your overall knowledge of your students and their readiness.
+              {stage === "observation"
+                ? "Observation phase: plan who to observe, what performance data to collect, and how to investigate patterns. (Section 2 student profiles are unchanged.)"
+                : stage === "post"
+                ? "Post-conference: reflect on readiness, success, struggle, and data-driven next steps. (Section 2 student profiles are unchanged.)"
+                : "Answer the following questions about your overall knowledge of your students and their readiness."}
             </p>
-            {PASO2_GENERAL_FIELDS.map((f) => (
-              <div key={f.key} className="auth-field" style={{ marginBottom: 16 }}>
-                <label className="auth-label" style={{ fontWeight: 600, marginBottom: 4, display: "block" }}>{f.label}</label>
-                <textarea
-                  className="auth-input paso-textarea"
-                  rows={3}
-                  placeholder={f.placeholder}
+            {paso2GeneralFields.map((f) => (
+              <div key={f.key} className="paso-form__section">
+                <PasoReviewRow
+                  cycleId={cycleId}
+                  stage={stage}
+                  pasoNum={2}
+                  section="general"
+                  fieldKey={f.key}
+                  questionLabel={f.label}
                   value={generalData[f.key]?.response || ""}
-                  onChange={(e) => handleGeneralChange(f.key, e.target.value)}
+                  onChange={(v) => handleGeneralChange(f.key, v)}
+                  placeholder={f.placeholder}
+                  rows={3}
                 />
               </div>
             ))}
@@ -460,22 +707,24 @@ const PASO3_FIELDS = [
   { key: "materialsResources", label: "Materials & Resources", type: "textarea", placeholder: "List all materials, texts, and resources needed" },
 ];
 
-function Paso3Form({ cycleId, data, onChange, onSave, saving }) {
+function Paso3Form({ cycleId, stage = "pre", data, onChange, onSave, saving, onAfterGeneralSave }) {
   const [activeSection, setActiveSection] = useState("general");
   const [generalData, setGeneralData] = useState({});
   const [generalSaving, setGeneralSaving] = useState(false);
-  const [generalLoaded, setGeneralLoaded] = useState(false);
 
   useEffect(() => {
-    if (!cycleId || generalLoaded) return;
+    if (!cycleId) return;
+    let cancelled = false;
     (async () => {
       try {
-        const res = await getPaso3General(cycleId);
-        if (res.paso3General) setGeneralData(res.paso3General);
-      } catch { /* silent */ }
-      setGeneralLoaded(true);
+        const res = await getPaso3General(cycleId, stage);
+        if (!cancelled) setGeneralData(res.paso3General ? { ...res.paso3General } : {});
+      } catch {
+        if (!cancelled) setGeneralData({});
+      }
     })();
-  }, [cycleId, generalLoaded]);
+    return () => { cancelled = true; };
+  }, [cycleId, stage]);
 
   async function handleSaveGeneral(mode) {
     if (!cycleId) return;
@@ -483,7 +732,8 @@ function Paso3Form({ cycleId, data, onChange, onSave, saving }) {
     try {
       const status = mode === "complete" ? "completed" : "draft";
       const { _id, __v, createdAt, updatedAt, teacherCycleId, teacherId, ...clean } = generalData;
-      await savePaso3General(cycleId, { ...clean, status });
+      await savePaso3General(cycleId, { ...clean, status }, stage);
+      onAfterGeneralSave?.();
     } catch { /* silent */ }
     setGeneralSaving(false);
   }
@@ -492,8 +742,10 @@ function Paso3Form({ cycleId, data, onChange, onSave, saving }) {
     setGeneralData((prev) => ({ ...prev, [key]: { response: value, isDraft: true } }));
   }
 
+  const paso3GeneralFields = stage === "observation" ? PASO3_GENERAL_FIELDS_OBSERVATION : stage === "post" ? PASO3_GENERAL_FIELDS_POST : PASO3_GENERAL_FIELDS;
+
   return (
-    <div className="paso-form">
+    <div className="paso-form paso-form--review">
       <div className="paso-form__header">
         <h2 className="paso-form__title">Paso 3 — Practice of Teaching/Preliminary Lesson Plan</h2>
         <p className="paso-form__desc">
@@ -533,17 +785,25 @@ function Paso3Form({ cycleId, data, onChange, onSave, saving }) {
           <div className="paso-form__section">
             <h3 className="paso-form__section-title">General Questions</h3>
             <p className="paso-form__desc" style={{ marginBottom: 16 }}>
-              Answer the following questions about your teaching practice and lesson design.
+              {stage === "observation"
+                ? "Observation phase: clarify observer focus, monitoring of the learning objective, and how pacing and engagement will be evaluated. (Section 2 fields are unchanged.)"
+                : stage === "post"
+                ? "Post-conference: reflect on how the lesson went, what you would change, and next steps for instruction. (Section 2 preliminary lesson plan is unchanged.)"
+                : "Answer the following questions about your teaching practice and lesson design."}
             </p>
-            {PASO3_GENERAL_FIELDS.map((f) => (
-              <div key={f.key} className="auth-field" style={{ marginBottom: 16 }}>
-                <label className="auth-label" style={{ fontWeight: 600, marginBottom: 4, display: "block" }}>{f.label}</label>
-                <textarea
-                  className="auth-input paso-textarea"
-                  rows={3}
-                  placeholder={f.placeholder}
+            {paso3GeneralFields.map((f) => (
+              <div key={f.key} className="paso-form__section">
+                <PasoReviewRow
+                  cycleId={cycleId}
+                  stage={stage}
+                  pasoNum={3}
+                  section="general"
+                  fieldKey={f.key}
+                  questionLabel={f.label}
                   value={generalData[f.key]?.response || ""}
-                  onChange={(e) => handleGeneralChange(f.key, e.target.value)}
+                  onChange={(v) => handleGeneralChange(f.key, v)}
+                  placeholder={f.placeholder}
+                  rows={3}
                 />
               </div>
             ))}
@@ -567,24 +827,20 @@ function Paso3Form({ cycleId, data, onChange, onSave, saving }) {
               Draft your initial lesson plan. This will be refined through the coaching process.
             </p>
             {PASO3_FIELDS.map((f) => (
-              <div key={f.key} className="auth-field" style={{ marginBottom: 16 }}>
-                <label className="auth-label">{f.label}</label>
-                {f.type === "textarea" ? (
-                  <textarea
-                    className="auth-input paso-textarea"
-                    rows={5}
-                    placeholder={f.placeholder}
-                    value={data[f.key] || ""}
-                    onChange={(e) => onChange({ ...data, [f.key]: e.target.value })}
-                  />
-                ) : (
-                  <input
-                    className="auth-input"
-                    placeholder={f.placeholder}
-                    value={data[f.key] || ""}
-                    onChange={(e) => onChange({ ...data, [f.key]: e.target.value })}
-                  />
-                )}
+              <div key={f.key} className="paso-form__section">
+                <PasoReviewRow
+                  cycleId={cycleId}
+                  stage={stage}
+                  pasoNum={3}
+                  section="plan"
+                  fieldKey={f.key}
+                  questionLabel={f.label}
+                  value={data[f.key] || ""}
+                  onChange={(v) => onChange({ ...data, [f.key]: v })}
+                  placeholder={f.placeholder}
+                  rows={f.type === "textarea" ? 5 : 2}
+                  multiline={f.type === "textarea"}
+                />
               </div>
             ))}
           </div>
@@ -622,22 +878,24 @@ const PASO4_FIELDS = [
   { key: "additionalNotes", label: "Additional Notes", placeholder: "Any other district-specific considerations…" },
 ];
 
-function Paso4Form({ cycleId, data, onChange, onSave, saving }) {
+function Paso4Form({ cycleId, stage = "pre", data, onChange, onSave, saving, onAfterGeneralSave }) {
   const [activeSection, setActiveSection] = useState("general");
   const [generalData, setGeneralData] = useState({});
   const [generalSaving, setGeneralSaving] = useState(false);
-  const [generalLoaded, setGeneralLoaded] = useState(false);
 
   useEffect(() => {
-    if (!cycleId || generalLoaded) return;
+    if (!cycleId) return;
+    let cancelled = false;
     (async () => {
       try {
-        const res = await getPaso4General(cycleId);
-        if (res.paso4General) setGeneralData(res.paso4General);
-      } catch { /* silent */ }
-      setGeneralLoaded(true);
+        const res = await getPaso4General(cycleId, stage);
+        if (!cancelled) setGeneralData(res.paso4General ? { ...res.paso4General } : {});
+      } catch {
+        if (!cancelled) setGeneralData({});
+      }
     })();
-  }, [cycleId, generalLoaded]);
+    return () => { cancelled = true; };
+  }, [cycleId, stage]);
 
   async function handleSaveGeneral(mode) {
     if (!cycleId) return;
@@ -645,7 +903,8 @@ function Paso4Form({ cycleId, data, onChange, onSave, saving }) {
     try {
       const status = mode === "complete" ? "completed" : "draft";
       const { _id, __v, createdAt, updatedAt, teacherCycleId, teacherId, ...clean } = generalData;
-      await savePaso4General(cycleId, { ...clean, status });
+      await savePaso4General(cycleId, { ...clean, status }, stage);
+      onAfterGeneralSave?.();
     } catch { /* silent */ }
     setGeneralSaving(false);
   }
@@ -654,8 +913,10 @@ function Paso4Form({ cycleId, data, onChange, onSave, saving }) {
     setGeneralData((prev) => ({ ...prev, [key]: { response: value, isDraft: true } }));
   }
 
+  const paso4GeneralFields = stage === "observation" ? PASO4_GENERAL_FIELDS_OBSERVATION : stage === "post" ? PASO4_GENERAL_FIELDS_POST : PASO4_GENERAL_FIELDS;
+
   return (
-    <div className="paso-form">
+    <div className="paso-form paso-form--review">
       <div className="paso-form__header">
         <h2 className="paso-form__title">Paso 4 — Knowledge of Sociopolitical Dynamics</h2>
         <p className="paso-form__desc">
@@ -686,7 +947,7 @@ function Paso4Form({ cycleId, data, onChange, onSave, saving }) {
             borderRadius: "8px 8px 0 0",
           }}
         >
-          Section 2 — District Guidelines
+          Section 2 — State Guidelines
         </button>
       </div>
 
@@ -695,17 +956,25 @@ function Paso4Form({ cycleId, data, onChange, onSave, saving }) {
           <div className="paso-form__section">
             <h3 className="paso-form__section-title">General Questions</h3>
             <p className="paso-form__desc" style={{ marginBottom: 16 }}>
-              Answer the following questions about sociopolitical dynamics and equitable access.
+              {stage === "observation"
+                ? "Observation phase: align data collection with equitable access, power dynamics, and groups needing extra focus. (Section 2 district guidelines are unchanged.)"
+                : stage === "post"
+                ? "Post-conference: reflect on equitable access, marginalization, and how well equity strategies worked. (Section 2 district guidelines are unchanged.)"
+                : "Answer the following questions about sociopolitical dynamics and equitable access."}
             </p>
-            {PASO4_GENERAL_FIELDS.map((f) => (
-              <div key={f.key} className="auth-field" style={{ marginBottom: 16 }}>
-                <label className="auth-label" style={{ fontWeight: 600, marginBottom: 4, display: "block" }}>{f.label}</label>
-                <textarea
-                  className="auth-input paso-textarea"
-                  rows={3}
-                  placeholder={f.placeholder}
+            {paso4GeneralFields.map((f) => (
+              <div key={f.key} className="paso-form__section">
+                <PasoReviewRow
+                  cycleId={cycleId}
+                  stage={stage}
+                  pasoNum={4}
+                  section="general"
+                  fieldKey={f.key}
+                  questionLabel={f.label}
                   value={generalData[f.key]?.response || ""}
-                  onChange={(e) => handleGeneralChange(f.key, e.target.value)}
+                  onChange={(v) => handleGeneralChange(f.key, v)}
+                  placeholder={f.placeholder}
+                  rows={3}
                 />
               </div>
             ))}
@@ -729,14 +998,18 @@ function Paso4Form({ cycleId, data, onChange, onSave, saving }) {
               Document the district-level requirements and standards that frame your instruction.
             </p>
             {PASO4_FIELDS.map((f) => (
-              <div key={f.key} className="auth-field" style={{ marginBottom: 16 }}>
-                <label className="auth-label">{f.label}</label>
-                <textarea
-                  className="auth-input paso-textarea"
-                  rows={5}
-                  placeholder={f.placeholder}
+              <div key={f.key} className="paso-form__section">
+                <PasoReviewRow
+                  cycleId={cycleId}
+                  stage={stage}
+                  pasoNum={4}
+                  section="guidelines"
+                  fieldKey={f.key}
+                  questionLabel={f.label}
                   value={data[f.key] || ""}
-                  onChange={(e) => onChange({ ...data, [f.key]: e.target.value })}
+                  onChange={(v) => onChange({ ...data, [f.key]: v })}
+                  placeholder={f.placeholder}
+                  rows={5}
                 />
               </div>
             ))}
@@ -768,27 +1041,34 @@ const PASO5_FIELDS = [
   { key: "q8_activitiesToLearn", label: "8. What activities will you use to learn more about your students?", placeholder: "Describe activities to learn about your students…" },
 ];
 
-function Paso5Form({ data, onChange, onSave, saving }) {
+function Paso5Form({ data, onChange, onSave, saving, stage = "pre", cycleId }) {
+  const paso5Fields = stage === "observation" ? PASO5_FIELDS_OBSERVATION : stage === "post" ? PASO5_FIELDS_POST : PASO5_FIELDS;
   return (
-    <div className="paso-form">
+    <div className="paso-form paso-form--review">
       <div className="paso-form__header">
         <h2 className="paso-form__title">Paso 5 — Practice of Knowing Learners, Families & Communities</h2>
         <p className="paso-form__desc">
-          Describe how you center student and family voice, language, and culture in your practice.
+          {stage === "observation"
+            ? "Observation phase: what to look for regarding engagement, connection to content, and classroom rapport."
+            : stage === "post"
+            ? "Post-conference: reflect on connection, backgrounds, home language, and relationships after the lesson."
+            : "Describe how you center student and family voice, language, and culture in your practice."}
         </p>
       </div>
-      {PASO5_FIELDS.map((f) => (
+      {paso5Fields.map((f) => (
         <div key={f.key} className="paso-form__section">
-          <div className="auth-field">
-            <label className="auth-label">{f.label}</label>
-            <textarea
-              className="auth-input paso-textarea"
-              rows={5}
-              placeholder={f.placeholder}
-              value={data[f.key] || ""}
-              onChange={(e) => onChange({ ...data, [f.key]: e.target.value })}
-            />
-          </div>
+          <PasoReviewRow
+            cycleId={cycleId}
+            stage={stage}
+            pasoNum={5}
+            section="main"
+            fieldKey={f.key}
+            questionLabel={f.label}
+            value={data[f.key] || ""}
+            onChange={(v) => onChange({ ...data, [f.key]: v })}
+            placeholder={f.placeholder}
+            rows={5}
+          />
         </div>
       ))}
       <div className="paso-form__actions">
@@ -821,18 +1101,24 @@ const PASO6_ADVOCACY_FIELDS = [
   { key: "q6_showLearningWays", label: "6. How can you create opportunities for students to show learning in different ways?", placeholder: "Describe varied ways for students to demonstrate learning…" },
 ];
 
-function Paso6Form({ data, onChange, onSave, saving }) {
+function Paso6Form({ data, onChange, onSave, saving, stage = "pre", cycleId }) {
+  const advocacyFields = stage === "observation" ? PASO6_ADVOCACY_FIELDS_OBSERVATION : stage === "post" ? PASO6_ADVOCACY_FIELDS_POST : PASO6_ADVOCACY_FIELDS;
+
   function setProgress(key, value) {
     const clamped = Math.min(100, Math.max(0, Number(value) || 0));
     onChange({ ...data, [key]: clamped });
   }
 
   return (
-    <div className="paso-form">
+    <div className="paso-form paso-form--review">
       <div className="paso-form__header">
         <h2 className="paso-form__title">Paso 6 — Practice of Advocacy</h2>
         <p className="paso-form__desc">
-          Track your growth across advocacy domains and gather feedback to inform your practice.
+          {stage === "observation"
+            ? "Observation phase: focus advocacy prompts on what can be observed during the lesson. Progress sliders below are unchanged."
+            : stage === "post"
+            ? "Post-conference: reflect on learning needs, advocacy, family communication, and supports you need. Progress sliders below are unchanged."
+            : "Track your growth across advocacy domains and gather feedback to inform your practice."}
         </p>
       </div>
 
@@ -864,15 +1150,20 @@ function Paso6Form({ data, onChange, onSave, saving }) {
 
       <div className="paso-form__section">
         <h3 className="paso-form__section-title">Advocacy Questions</h3>
-        {PASO6_ADVOCACY_FIELDS.map((f) => (
-          <div key={f.key} className="auth-field" style={{ marginBottom: 14 }}>
-            <label className="auth-label">{f.label}</label>
-            <textarea
-              className="auth-input paso-textarea"
-              rows={4}
-              placeholder={f.placeholder}
+        {advocacyFields.map((f) => (
+          <div key={f.key} className="paso-form__section" style={{ marginBottom: 8 }}>
+            <PasoReviewRow
+              cycleId={cycleId}
+              stage={stage}
+              pasoNum={6}
+              section="advocacy"
+              fieldKey={f.key}
+              questionLabel={f.label}
               value={data[f.key] || ""}
-              onChange={(e) => onChange({ ...data, [f.key]: e.target.value })}
+              onChange={(v) => onChange({ ...data, [f.key]: v })}
+              placeholder={f.placeholder}
+              rows={4}
+              useHeading={false}
             />
           </div>
         ))}
@@ -993,19 +1284,37 @@ function LessonPlanView({ plan, onRegenerate, generating, onSaveContent, onFinal
   const inputs = isDoc ? plan.paso1to5Input : null;
   const status = isDoc ? plan.status : null;
 
+  const lpInputStage = inputs?.stage || plan?.stage || "pre";
+  const lpObs = lpInputStage === "observation";
+  const lpPost = lpInputStage === "post";
+
+  const lpPaso1Fields = lpObs ? PASO1_FIELDS_OBSERVATION : lpPost ? PASO1_FIELDS_POST : PASO1_FIELDS;
+  const lpPaso2GeneralFields = lpObs ? PASO2_GENERAL_FIELDS_OBSERVATION : lpPost ? PASO2_GENERAL_FIELDS_POST : PASO2_GENERAL_FIELDS;
+  const lpPaso3GeneralFields = lpObs ? PASO3_GENERAL_FIELDS_OBSERVATION : lpPost ? PASO3_GENERAL_FIELDS_POST : PASO3_GENERAL_FIELDS;
+  const lpPaso4GeneralFields = lpObs ? PASO4_GENERAL_FIELDS_OBSERVATION : lpPost ? PASO4_GENERAL_FIELDS_POST : PASO4_GENERAL_FIELDS;
+  const lpPaso5Fields = lpObs ? PASO5_FIELDS_OBSERVATION : lpPost ? PASO5_FIELDS_POST : PASO5_FIELDS;
+  const lpPaso6AdvocacyFields = lpObs ? PASO6_ADVOCACY_FIELDS_OBSERVATION : lpPost ? PASO6_ADVOCACY_FIELDS_POST : PASO6_ADVOCACY_FIELDS;
+
   const inputSummary = inputs ? {
-    paso1Fields: inputs.paso1 ? ["q1_positionality", "q2_hiddenCurriculum", "q3_explicitTeaching", "q4_contentKnowledge", "q5_learningProcess", "q6_studentRelationship", "q7_diversityAffirmation", "q8_learnerModeling", "q9_growthMindset", "q10_preparedness"].filter((k) => inputs.paso1[k]?.response) : [],
-    paso2GeneralFields: inputs.paso2General ? PASO2_GENERAL_FIELDS.filter((f) => inputs.paso2General[f.key]?.response) : [],
-    paso3GeneralFields: inputs.paso3General ? PASO3_GENERAL_FIELDS.filter((f) => inputs.paso3General[f.key]?.response) : [],
-    paso4GeneralFields: inputs.paso4General ? PASO4_GENERAL_FIELDS.filter((f) => inputs.paso4General[f.key]?.response) : [],
-    paso5Fields: inputs.paso5 ? PASO5_FIELDS.filter((f) => inputs.paso5[f.key]) : [],
-    paso6Fields: inputs.paso6 ? PASO6_ADVOCACY_FIELDS.filter((f) => inputs.paso6[f.key]) : [],
+    paso1Fields: inputs.paso1 ? lpPaso1Fields.map((f) => f.key).filter((k) => inputs.paso1[k]?.response) : [],
+    paso2GeneralFields: inputs.paso2General ? lpPaso2GeneralFields.filter((f) => inputs.paso2General[f.key]?.response) : [],
+    paso3GeneralFields: inputs.paso3General ? lpPaso3GeneralFields.filter((f) => inputs.paso3General[f.key]?.response) : [],
+    paso4GeneralFields: inputs.paso4General ? lpPaso4GeneralFields.filter((f) => inputs.paso4General[f.key]?.response) : [],
+    paso5Fields: inputs.paso5 ? lpPaso5Fields.filter((f) => inputs.paso5[f.key]) : [],
+    paso6Fields: inputs.paso6 ? lpPaso6AdvocacyFields.filter((f) => inputs.paso6[f.key]) : [],
     studentCount: inputs.paso2Students?.length || 0,
     students: (inputs.paso2Students || []).map((s) => `${s.student?.firstName || "?"} ${s.student?.lastName || ""}`),
     lessonTitle: inputs.paso3?.lessonTitle || null,
     subject: inputs.paso3?.subjectArea || null,
     grade: inputs.paso3?.gradeLevel || null,
   } : null;
+
+  const nPaso1 = lpObs ? 3 : lpPost ? 5 : 10;
+  const nPaso2g = lpObs ? 3 : lpPost ? 4 : 10;
+  const nPaso3g = lpObs ? 3 : lpPost ? 3 : 9;
+  const nPaso4g = lpObs ? 3 : lpPost ? 3 : 7;
+  const nPaso5 = lpObs ? 3 : lpPost ? 4 : 8;
+  const nPaso6 = lpObs ? 3 : lpPost ? 4 : 6;
 
   return (
     <div className="lp-view">
@@ -1020,11 +1329,16 @@ function LessonPlanView({ plan, onRegenerate, generating, onSaveContent, onFinal
               {[inputs?.paso3?.subjectArea, inputs?.paso3?.gradeLevel].filter(Boolean).join(" · ") || "Generated from Pasos 1–6"}
             </p>
           </div>
-          {status && (
-            <span className={`lp-badge lp-badge--${status}`}>
-              {status === "generated" ? "Generated" : status}
-            </span>
-          )}
+          <div className="lp-header__badges">
+            {plan.stage && (
+              <span className="lp-badge lp-badge--stage">{STAGE_LABELS[plan.stage] || plan.stage}</span>
+            )}
+            {status && (
+              <span className={`lp-badge lp-badge--${status}`}>
+                {status === "generated" ? "Generated" : status}
+              </span>
+            )}
+          </div>
         </div>
         {createdAt && (
           <p className="lp-header__date">
@@ -1037,27 +1351,27 @@ function LessonPlanView({ plan, onRegenerate, generating, onSaveContent, onFinal
       {inputSummary && (
         <div className="lp-stats">
           <div className="lp-stat">
-            <span className="lp-stat__num">{inputSummary.paso1Fields.length}/10</span>
+            <span className="lp-stat__num">{inputSummary.paso1Fields.length}/{nPaso1}</span>
             <span className="lp-stat__label">Paso 1 Reflections</span>
           </div>
           <div className="lp-stat">
-            <span className="lp-stat__num">{inputSummary.paso2GeneralFields.length}/10</span>
+            <span className="lp-stat__num">{inputSummary.paso2GeneralFields.length}/{nPaso2g}</span>
             <span className="lp-stat__label">Paso 2 General</span>
           </div>
           <div className="lp-stat">
-            <span className="lp-stat__num">{inputSummary.paso3GeneralFields.length}/9</span>
+            <span className="lp-stat__num">{inputSummary.paso3GeneralFields.length}/{nPaso3g}</span>
             <span className="lp-stat__label">Paso 3 General</span>
           </div>
           <div className="lp-stat">
-            <span className="lp-stat__num">{inputSummary.paso4GeneralFields.length}/7</span>
+            <span className="lp-stat__num">{inputSummary.paso4GeneralFields.length}/{nPaso4g}</span>
             <span className="lp-stat__label">Paso 4 General</span>
           </div>
           <div className="lp-stat">
-            <span className="lp-stat__num">{inputSummary.paso5Fields.length}/8</span>
+            <span className="lp-stat__num">{inputSummary.paso5Fields.length}/{nPaso5}</span>
             <span className="lp-stat__label">Paso 5</span>
           </div>
           <div className="lp-stat">
-            <span className="lp-stat__num">{inputSummary.paso6Fields.length}/6</span>
+            <span className="lp-stat__num">{inputSummary.paso6Fields.length}/{nPaso6}</span>
             <span className="lp-stat__label">Paso 6</span>
           </div>
           <div className="lp-stat">
@@ -1139,7 +1453,7 @@ function LessonPlanView({ plan, onRegenerate, generating, onSaveContent, onFinal
           {inputs.paso1 && (
             <div className="lp-inputs__section">
               <h4>Paso 1 — Knowledge of Self</h4>
-              {PASO1_FIELDS.map((f) => {
+              {lpPaso1Fields.map((f) => {
                 const v = inputs.paso1[f.key]?.response;
                 if (!v) return null;
                 return <div key={f.key} className="lp-inputs__field"><strong>{f.label}:</strong> {v}</div>;
@@ -1150,7 +1464,7 @@ function LessonPlanView({ plan, onRegenerate, generating, onSaveContent, onFinal
           {inputs.paso2General && (
             <div className="lp-inputs__section">
               <h4>Paso 2 — Section 1: General Questions</h4>
-              {PASO2_GENERAL_FIELDS.map((f) => {
+              {lpPaso2GeneralFields.map((f) => {
                 const v = inputs.paso2General[f.key]?.response;
                 if (!v) return null;
                 return <div key={f.key} className="lp-inputs__field"><strong>{f.label}:</strong> {v}</div>;
@@ -1177,7 +1491,7 @@ function LessonPlanView({ plan, onRegenerate, generating, onSaveContent, onFinal
           {inputs.paso3General && (
             <div className="lp-inputs__section">
               <h4>Paso 3 — Section 1: General Questions</h4>
-              {PASO3_GENERAL_FIELDS.map((f) => {
+              {lpPaso3GeneralFields.map((f) => {
                 const v = inputs.paso3General[f.key]?.response;
                 if (!v) return null;
                 return <div key={f.key} className="lp-inputs__field"><strong>{f.label}:</strong> {v}</div>;
@@ -1199,7 +1513,7 @@ function LessonPlanView({ plan, onRegenerate, generating, onSaveContent, onFinal
           {inputs.paso4General && (
             <div className="lp-inputs__section">
               <h4>Paso 4 — Section 1: General Questions</h4>
-              {PASO4_GENERAL_FIELDS.map((f) => {
+              {lpPaso4GeneralFields.map((f) => {
                 const v = inputs.paso4General[f.key]?.response;
                 if (!v) return null;
                 return <div key={f.key} className="lp-inputs__field"><strong>{f.label}:</strong> {v}</div>;
@@ -1209,7 +1523,7 @@ function LessonPlanView({ plan, onRegenerate, generating, onSaveContent, onFinal
 
           {inputs.paso4 && (
             <div className="lp-inputs__section">
-              <h4>Paso 4 — Section 2: District Guidelines</h4>
+              <h4>Paso 4 — Section 2: State Guidelines</h4>
               {[["districtStandards", "Standards"], ["curriculumRequirements", "Curriculum"], ["assessmentGuidelines", "Assessment"], ["accommodationPolicies", "Accommodations"]].map(([k, l]) => {
                 const v = inputs.paso4[k];
                 if (!v) return null;
@@ -1221,7 +1535,7 @@ function LessonPlanView({ plan, onRegenerate, generating, onSaveContent, onFinal
           {inputs.paso5 && (
             <div className="lp-inputs__section">
               <h4>Paso 5 — Practice of Knowing Learners, Families & Communities</h4>
-              {PASO5_FIELDS.map((f) => {
+              {lpPaso5Fields.map((f) => {
                 const v = inputs.paso5[f.key];
                 if (!v) return null;
                 return <div key={f.key} className="lp-inputs__field"><strong>{f.label}:</strong> {v}</div>;
@@ -1232,7 +1546,7 @@ function LessonPlanView({ plan, onRegenerate, generating, onSaveContent, onFinal
           {inputs.paso6 && (
             <div className="lp-inputs__section">
               <h4>Paso 6 — Practice of Advocacy</h4>
-              {PASO6_ADVOCACY_FIELDS.map((f) => {
+              {lpPaso6AdvocacyFields.map((f) => {
                 const v = inputs.paso6[f.key];
                 if (!v) return null;
                 return <div key={f.key} className="lp-inputs__field"><strong>{f.label}:</strong> {v}</div>;
@@ -1265,13 +1579,24 @@ function LessonPlanView({ plan, onRegenerate, generating, onSaveContent, onFinal
 
 /* ─── Dashboard Home ─────────────────────────────────────────────────── */
 
-function DashboardHome({ user, cycle, pasoStatuses, onNavigate, savedPlans }) {
+function DashboardHome({
+  user,
+  cycle,
+  progressData,
+  onNavigate,
+  savedPlans,
+  onOpenNewPlanModal,
+  totalProgressOpen,
+  onToggleTotalProgress,
+}) {
   const firstName = user?.firstName || "Educator";
-  const completedCount = Object.values(pasoStatuses).filter((s) => s === "completed").length;
-  const progress = Math.round((completedCount / 6) * 100);
+  const totalPct = progressData?.totalPct ?? 0;
+  const cid = cycle?._id || cycle?.id;
+  const cyclePlans = (savedPlans || []).filter((p) => (p.teacherCycleId || "").toString() === (cid || "").toString());
+  const activePlan = cyclePlans[0];
 
   return (
-    <section className="dashboard-content">
+    <section className="dashboard-content dashboard-home">
       <div className="dashboard-welcome">
         <div className="dashboard-welcome__text">
           <h1 className="dashboard-welcome__title">
@@ -1279,68 +1604,126 @@ function DashboardHome({ user, cycle, pasoStatuses, onNavigate, savedPlans }) {
           </h1>
           <p className="dashboard-welcome__desc">
             {cycle
-              ? `You are working on cycle "${cycle.name || "Current Cycle"}". ${completedCount} of 6 Pasos completed.`
+              ? `Cycle "${cycle.name || "Current Cycle"}". Use the sidebar stages to work Pasos 1–6 for Pre, Observation, and Post.`
               : "Start a new coaching cycle to begin your Camino."}
           </p>
         </div>
-        <div className="dashboard-progress-box">
-          <span className="dashboard-progress__label">TOTAL PROGRESS</span>
-          <span className="dashboard-progress__value">{progress}%</span>
-          <div className="dashboard-progress__bar">
-            <div className="dashboard-progress__fill" style={{ width: `${progress}%` }} />
+        <button
+          type="button"
+          className={`dashboard-progress-box dashboard-progress-box--clickable ${totalProgressOpen ? "dashboard-progress-box--open" : ""}`}
+          onClick={onToggleTotalProgress}
+        >
+          <span className="dashboard-progress__label">TOTAL PROGRESS ▾</span>
+          <span className="dashboard-progress__value">{totalPct}%</span>
+          <div className="dashboard-progress__bar dashboard-progress__bar--total">
+            <div className="dashboard-progress__fill dashboard-progress__fill--total" style={{ width: `${totalPct}%` }} />
           </div>
-        </div>
+        </button>
       </div>
 
-      <section className="dashboard-section">
-        <h2 className="dashboard-section__title">
-          <span className="dashboard-section__icon">📖</span>
-          Your Camino Pathway
-        </h2>
-        <div className="pathway-grid">
-          {PASO_META.map((p) => {
-            const status = pasoStatuses[p.num] || "pending";
-            const statusLabel = status === "completed" ? "COMPLETED" : status === "draft" ? "IN PROGRESS" : "NOT STARTED";
-            const cardClass =
-              status === "completed" ? "completed" : status === "draft" ? "in_progress" : "locked";
+      {totalProgressOpen && progressData?.stages && (
+        <div className="progress-hierarchy">
+          {STAGE_NAV.map((st) => {
+            const agg = getStageAggregate(progressData, st.id);
             return (
-              <div
-                key={p.num}
-                className={`pathway-card pathway-card--${cardClass} paso-clickable`}
-                onClick={() => onNavigate(`paso${p.num}`)}
-              >
-                <div className={`pathway-card__icon pathway-card__icon--${cardClass}`}>
-                  {status === "completed" ? "✓" : p.num}
+              <div key={st.id} className={`progress-hierarchy__stage progress-hierarchy__stage--${st.theme}`}>
+                <div className="progress-hierarchy__stage-head">
+                  <strong>{st.label}</strong>
+                  <span>{agg.stagePct}%</span>
                 </div>
-                <span className={`pathway-card__pill pathway-card__pill--${cardClass}`}>
-                  {statusLabel}
-                </span>
-                <h3 className="pathway-card__title">{p.label}: {p.name}</h3>
-                <p className="pathway-card__desc">{p.name}</p>
-                <div className="pathway-card__footer">
-                  <span className="pathway-card__action">
-                    {status === "completed" ? "Review →" : status === "draft" ? "Continue →" : "Start →"}
-                  </span>
+                <div className="dashboard-progress__bar dashboard-progress__bar--stage">
+                  <div
+                    className={`dashboard-progress__fill dashboard-progress__fill--${st.theme}`}
+                    style={{ width: `${agg.stagePct}%` }}
+                  />
                 </div>
+                <ul className="progress-hierarchy__pasos">
+                  {PASO_META.map((p) => {
+                    const pct = progressData.stages[st.id]?.pasos?.[`paso${p.num}`]?.pct ?? 0;
+                    return (
+                      <li key={p.num} className="progress-hierarchy__paso">
+                        <span className="progress-hierarchy__paso-name">{p.label}</span>
+                        <span className="progress-hierarchy__paso-pct">{pct}%</span>
+                        <div className="dashboard-progress__bar dashboard-progress__bar--paso">
+                          <div
+                            className={`dashboard-progress__fill dashboard-progress__fill--${st.theme}`}
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
               </div>
             );
           })}
         </div>
-      </section>
+      )}
 
-      {/* Lesson Plans section */}
+      <div className="dashboard-home__stage-bars">
+        <h3 className="dashboard-section__subtitle">Stage progress</h3>
+        <div className="dashboard-stage-bars">
+          {STAGE_NAV.map((st) => {
+            const agg = getStageAggregate(progressData, st.id);
+            return (
+              <div key={st.id} className={`dashboard-stage-bar dashboard-stage-bar--${st.theme}`}>
+                <div className="dashboard-stage-bar__label">{st.short}</div>
+                <div className="dashboard-progress__bar dashboard-progress__bar--stage-inline">
+                  <div
+                    className={`dashboard-progress__fill dashboard-progress__fill--${st.theme}`}
+                    style={{ width: `${agg.stagePct}%` }}
+                  />
+                </div>
+                <span className="dashboard-stage-bar__pct">{agg.stagePct}%</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {activePlan && (
+        <section className="dashboard-section">
+          <h2 className="dashboard-section__title">
+            <span className="dashboard-section__icon">📌</span>
+            Active plan (latest in this cycle)
+          </h2>
+          <div
+            className="lp-card-preview lp-card-preview--active paso-clickable"
+            onClick={() => onNavigate(`plan:${activePlan._id}`)}
+          >
+            <div className="lp-card-preview__header">
+              <span className={`lp-badge lp-badge--${activePlan.status || "generated"}`}>
+                {activePlan.status === "finalized" ? "Finalized" : activePlan.status === "draft" ? "Draft" : "Generated"}
+              </span>
+              <span className="lp-badge lp-badge--stage">{STAGE_LABELS[activePlan.stage] || activePlan.stage || "Pre"}</span>
+            </div>
+            <h3 className="lp-card-preview__title">
+              {activePlan.paso1to5Input?.paso3?.lessonTitle || "Lesson plan"}
+            </h3>
+            <p className="lp-card-preview__meta paso-muted">
+              Updated {activePlan.updatedAt ? new Date(activePlan.updatedAt).toLocaleString() : "—"}
+            </p>
+          </div>
+        </section>
+      )}
+
       <section className="dashboard-section">
-        <h2 className="dashboard-section__title">
-          <span className="dashboard-section__icon">📝</span>
-          My Lesson Plans
-        </h2>
-        {(!savedPlans || savedPlans.length === 0) ? (
+        <div className="dashboard-section__headrow">
+          <h2 className="dashboard-section__title" style={{ marginBottom: 0 }}>
+            <span className="dashboard-section__icon">📝</span>
+            Lesson plans (this cycle)
+          </h2>
+          <button type="button" className="btn btn--resume" onClick={onOpenNewPlanModal}>
+            + New Lesson Plan
+          </button>
+        </div>
+        {cyclePlans.length === 0 ? (
           <div className="lp-empty">
-            <p className="paso-muted">No lesson plans yet. Complete Pasos 1–5 and generate your first plan.</p>
+            <p className="paso-muted">No lesson plans for this cycle yet. Create a blank draft or generate from your Paso data.</p>
           </div>
         ) : (
           <div className="lp-cards-grid">
-            {savedPlans.slice(0, 4).map((p) => {
+            {cyclePlans.slice(0, 6).map((p) => {
               const title = p.paso1to5Input?.paso3?.lessonTitle || "Untitled Plan";
               const subject = p.paso1to5Input?.paso3?.subjectArea || "";
               const grade = p.paso1to5Input?.paso3?.gradeLevel || "";
@@ -1351,19 +1734,21 @@ function DashboardHome({ user, cycle, pasoStatuses, onNavigate, savedPlans }) {
                     <span className={`lp-badge lp-badge--${p.status || "generated"}`}>
                       {p.status === "finalized" ? "Finalized" : p.status === "draft" ? "Draft" : "Generated"}
                     </span>
+                    <span className="lp-badge lp-badge--stage">{STAGE_LABELS[p.stage] || p.stage || "Pre"}</span>
                     <span className="lp-card-preview__date">{date}</span>
                   </div>
                   <h3 className="lp-card-preview__title">{title}</h3>
                   <p className="lp-card-preview__meta">{[subject, grade].filter(Boolean).join(" · ") || "Lesson Plan"}</p>
                   <p className="lp-card-preview__snippet">
-                    {(p.content || "").replace(/[#*_]/g, "").substring(0, 120)}…
+                    {(p.content || "").replace(/[#*_]/g, "").substring(0, 120)}
+                    {(p.content || "").length > 120 ? "…" : ""}
                   </p>
                 </div>
               );
             })}
           </div>
         )}
-        {savedPlans && savedPlans.length > 0 && (
+        {cyclePlans.length > 0 && (
           <button className="btn btn--ghost" style={{ marginTop: 12 }} onClick={() => onNavigate("plans")}>
             View All Plans →
           </button>
@@ -1375,21 +1760,26 @@ function DashboardHome({ user, cycle, pasoStatuses, onNavigate, savedPlans }) {
 
 /* ─── Plans List View ────────────────────────────────────────────────── */
 
-function PlansListView({ plans, onOpen, onGenerate, generating, onDelete }) {
+function PlansListView({ plans, onOpen, onNewLessonPlan, onGenerate, generating, onDelete }) {
   return (
     <div className="lp-list-view">
       <div className="lp-list-view__header">
         <h2 className="lp-list-view__title">My Lesson Plans</h2>
-        {onGenerate && (
-          <button className="btn btn--resume" disabled={generating} onClick={onGenerate}>
-            {generating ? "Generating…" : "✨ Generate New Plan"}
+        <div className="lp-list-view__actions">
+          <button type="button" className="btn btn--ghost" onClick={onNewLessonPlan}>
+            + New Lesson Plan
           </button>
-        )}
+          {onGenerate && (
+            <button className="btn btn--resume" disabled={generating} onClick={onGenerate}>
+              {generating ? "Generating…" : "✨ Quick generate (current stage)"}
+            </button>
+          )}
+        </div>
       </div>
       {(!plans || plans.length === 0) ? (
         <div className="lp-empty" style={{ marginTop: 32 }}>
           <div className="paso-empty-state__icon">📝</div>
-          <p className="paso-muted">No lesson plans generated yet.</p>
+          <p className="paso-muted">No lesson plans yet. Use New Lesson Plan to add a blank draft or generate with AI.</p>
         </div>
       ) : (
         <div className="lp-list-grid">
@@ -1413,6 +1803,7 @@ function PlansListView({ plans, onOpen, onGenerate, generating, onDelete }) {
                   <span className={`lp-badge lp-badge--${p.status || "generated"}`}>
                     {p.status === "finalized" ? "Finalized" : p.status === "draft" ? "Draft" : "Generated"}
                   </span>
+                  <span className="lp-badge lp-badge--stage">{STAGE_LABELS[p.stage] || p.stage || "Pre"}</span>
                   <span className="lp-list-item__date">
                     Created {created}{updated !== created ? ` · Updated ${updated}` : ""}
                   </span>
@@ -1448,9 +1839,15 @@ function TeacherDashboard({ user, onLogout }) {
   const [toast, setToast] = useState(null);
 
   const [pasoData, setPasoData] = useState({});
-  const [pasoStatuses, setPasoStatuses] = useState({});
   const [pasoLoading, setPasoLoading] = useState(false);
   const [pasoSaving, setPasoSaving] = useState(false);
+
+  const [activeStage, setActiveStage] = useState("pre");
+  const [progressData, setProgressData] = useState(null);
+  const [totalProgressOpen, setTotalProgressOpen] = useState(false);
+  const [showNewPlanModal, setShowNewPlanModal] = useState(false);
+  const [newPlanModalStage, setNewPlanModalStage] = useState("pre");
+  const [creatingBlankPlan, setCreatingBlankPlan] = useState(false);
 
   const [lessonPlan, setLessonPlan] = useState(null);
   const [generating, setGenerating] = useState(false);
@@ -1472,16 +1869,12 @@ function TeacherDashboard({ user, onLogout }) {
         const full = await getCycle(latest._id || latest.id);
         const c = full.cycle || full;
         setCycle(c);
-        const statuses = {};
-        const ps = c.pasoStatuses || c.pasos;
-        if (ps) {
-          for (let num = 1; num <= 6; num++) {
-            const val = ps[`paso${num}`] ?? ps[num];
-            if (val && typeof val === "string") statuses[num] = val === "completed" ? "completed" : val === "in_progress" ? "draft" : "pending";
-            else if (val && val.status) statuses[num] = val.status === "completed" ? "completed" : val.status === "draft" ? "draft" : "pending";
-          }
+        try {
+          const prog = await getCycleProgress(c._id || c.id);
+          setProgressData(prog);
+        } catch {
+          setProgressData(null);
         }
-        setPasoStatuses(statuses);
       }
       try {
         const plansRes = await listLessonPlans();
@@ -1495,6 +1888,16 @@ function TeacherDashboard({ user, onLogout }) {
 
   useEffect(() => { bootstrap(); }, [bootstrap]);
 
+  const refreshProgress = useCallback(async () => {
+    if (!cycle?._id && !cycle?.id) return;
+    try {
+      const prog = await getCycleProgress(cycle._id || cycle.id);
+      setProgressData(prog);
+    } catch {
+      /* keep previous */
+    }
+  }, [cycle]);
+
   /* ── Create cycle ──────────────────────────────────────────────────── */
 
   async function handleCreateCycle() {
@@ -1504,8 +1907,14 @@ function TeacherDashboard({ user, onLogout }) {
       const res = await createCycle(cycleName.trim());
       const c = res.cycle || res;
       setCycle(c);
-      setPasoStatuses({});
+      setActiveStage("pre");
       setCycleName("");
+      try {
+        const prog = await getCycleProgress(c._id || c.id);
+        setProgressData(prog);
+      } catch {
+        setProgressData(null);
+      }
       setToast({ msg: "Cycle created!", type: "success" });
     } catch (err) {
       setToast({ msg: err.message, type: "error" });
@@ -1515,11 +1924,12 @@ function TeacherDashboard({ user, onLogout }) {
 
   /* ── Load paso data ────────────────────────────────────────────────── */
 
-  async function loadPaso(num) {
+  const loadPaso = useCallback(async (num, stageOverride) => {
     if (!cycle) return;
+    const st = stageOverride ?? activeStage;
     setPasoLoading(true);
     try {
-      const res = await getPaso(cycle._id || cycle.id, num);
+      const res = await getPaso(cycle._id || cycle.id, num, st);
       const key = `paso${num}`;
       let d;
       if (num === 2) {
@@ -1538,7 +1948,12 @@ function TeacherDashboard({ user, onLogout }) {
       setPasoData((prev) => ({ ...prev, [num]: prev[num] || {} }));
     }
     setPasoLoading(false);
-  }
+  }, [cycle, activeStage]);
+
+  useEffect(() => {
+    const m = view?.match(/^paso(\d)$/);
+    if (m && cycle) loadPaso(Number(m[1]));
+  }, [view, activeStage, cycle, loadPaso]);
 
   /* ── Save paso data ────────────────────────────────────────────────── */
 
@@ -1554,8 +1969,8 @@ function TeacherDashboard({ user, onLogout }) {
       const raw = overridePayload || pasoData[num] || {};
       const { _id, __v, createdAt, updatedAt, teacherCycleId, teacherId, ...clean } = raw;
       const payload = { ...clean, status };
-      await savePaso(cycle._id || cycle.id, num, payload);
-      setPasoStatuses((prev) => ({ ...prev, [num]: status }));
+      await savePaso(cycle._id || cycle.id, num, payload, activeStage);
+      await refreshProgress();
       setToast({ msg: mode === "complete" ? `Paso ${num} completed!` : "Draft saved.", type: "success" });
       if (mode === "complete" && num < 6) {
         navigateTo(`paso${num + 1}`);
@@ -1568,11 +1983,12 @@ function TeacherDashboard({ user, onLogout }) {
 
   /* ── Generate lesson plan ──────────────────────────────────────────── */
 
-  async function handleGenerate() {
+  async function handleGenerateWithStage(stage) {
     if (!cycle) return;
     setGenerating(true);
+    setShowNewPlanModal(false);
     try {
-      const res = await generateLessonPlan(cycle._id || cycle.id);
+      const res = await generateLessonPlan(cycle._id || cycle.id, stage || activeStage);
       const plan = res.lessonPlan || res;
       setLessonPlan(plan);
       setToast({ msg: "Lesson plan generated!", type: "success" });
@@ -1585,6 +2001,26 @@ function TeacherDashboard({ user, onLogout }) {
       setToast({ msg: err.message, type: "error" });
     }
     setGenerating(false);
+  }
+
+  async function handleBlankPlanFromModal() {
+    if (!cycle) return;
+    setCreatingBlankPlan(true);
+    setShowNewPlanModal(false);
+    try {
+      const res = await createBlankLessonPlan({ teacherCycleId: cycle._id || cycle.id, stage: newPlanModalStage });
+      const plan = res.lessonPlan || res;
+      setLessonPlan(plan);
+      setToast({ msg: "Blank draft created.", type: "success" });
+      setView("lessonPlan");
+      try {
+        const plansRes = await listLessonPlans();
+        setSavedPlans(plansRes.lessonPlans || []);
+      } catch { /* silent */ }
+    } catch (err) {
+      setToast({ msg: err.message, type: "error" });
+    }
+    setCreatingBlankPlan(false);
   }
 
   async function handleOpenPlan(planId) {
@@ -1645,8 +2081,8 @@ function TeacherDashboard({ user, onLogout }) {
 
   function navigateTo(target) {
     setView(target);
-    const pasoMatch = target.match(/^paso(\d)$/);
-    if (pasoMatch) loadPaso(Number(pasoMatch[1]));
+    const stageMatch = target.match(/^stage:(pre|observation|post)$/);
+    if (stageMatch) setActiveStage(stageMatch[1]);
     const planMatch = target.match(/^plan:(.+)$/);
     if (planMatch) handleOpenPlan(planMatch[1]);
   }
@@ -1655,8 +2091,14 @@ function TeacherDashboard({ user, onLogout }) {
     setPasoData((prev) => ({ ...prev, [num]: newData }));
   }
 
-  const canGenerate =
-    [1, 2, 3, 4, 5].every((n) => pasoStatuses[n] === "completed" || pasoStatuses[n] === "draft");
+  function themeStageId() {
+    if (view === "lessonPlan" && lessonPlan?.stage) return lessonPlan.stage;
+    if (view?.startsWith("stage:")) return view.split(":")[1];
+    const pm = view?.match(/^paso(\d)$/);
+    if (pm) return activeStage;
+    return activeStage;
+  }
+  const themeStage = STAGE_NAV.find((s) => s.id === themeStageId())?.theme || "stage-pre";
 
   /* ── Header title based on view ────────────────────────────────────── */
 
@@ -1664,10 +2106,14 @@ function TeacherDashboard({ user, onLogout }) {
     if (view === "home") return "Dashboard";
     if (view === "lessonPlan") return "Lesson Plan";
     if (view === "plans") return "My Lesson Plans";
+    if (view === "stage:pre") return "Pre conference";
+    if (view === "stage:observation") return "Observation";
+    if (view === "stage:post") return "Post conference / reflection";
     const m = view.match(/^paso(\d)$/);
     if (m) {
       const meta = PASO_META.find((p) => p.num === Number(m[1]));
-      return meta ? `${meta.label} — ${meta.name}` : "Paso";
+      const stl = STAGE_LABELS[activeStage] || activeStage;
+      return meta ? `${stl} · ${meta.label} — ${meta.name}` : "Paso";
     }
     return "Dashboard";
   }
@@ -1710,7 +2156,18 @@ function TeacherDashboard({ user, onLogout }) {
     }
 
     if (view === "home") {
-      return <DashboardHome user={user} cycle={cycle} pasoStatuses={pasoStatuses} onNavigate={navigateTo} savedPlans={savedPlans} />;
+      return (
+        <DashboardHome
+          user={user}
+          cycle={cycle}
+          progressData={progressData}
+          onNavigate={navigateTo}
+          savedPlans={savedPlans}
+          onOpenNewPlanModal={() => { setNewPlanModalStage(activeStage); setShowNewPlanModal(true); }}
+          totalProgressOpen={totalProgressOpen}
+          onToggleTotalProgress={() => setTotalProgressOpen((o) => !o)}
+        />
+      );
     }
 
     if (view === "plans") {
@@ -1719,7 +2176,8 @@ function TeacherDashboard({ user, onLogout }) {
           <PlansListView
             plans={savedPlans}
             onOpen={(id) => navigateTo(`plan:${id}`)}
-            onGenerate={canGenerate ? handleGenerate : null}
+            onNewLessonPlan={() => { setNewPlanModalStage(activeStage); setShowNewPlanModal(true); }}
+            onGenerate={() => handleGenerateWithStage(activeStage)}
             generating={generating}
             onDelete={handleDeletePlan}
           />
@@ -1732,13 +2190,63 @@ function TeacherDashboard({ user, onLogout }) {
         <section className="dashboard-content">
           <LessonPlanView
             plan={lessonPlan}
-            onRegenerate={handleGenerate}
+            onRegenerate={() => handleGenerateWithStage(lessonPlan?.stage || activeStage)}
             generating={generating}
             onSaveContent={handleSavePlanContent}
             onFinalize={handleFinalizePlan}
             onBackToList={() => navigateTo("plans")}
             onDelete={handleDeletePlan}
           />
+        </section>
+      );
+    }
+
+    if (view && view.startsWith("stage:")) {
+      const stageId = view.split(":")[1];
+      const stTheme = STAGE_NAV.find((x) => x.id === stageId)?.theme || "stage-pre";
+      return (
+        <section className={`dashboard-content dashboard-content--stage ${stTheme}`}>
+          <div className="dashboard-section">
+            <h2 className="dashboard-section__title">
+              <span className="dashboard-section__icon">🧩</span>
+              {stageId === "pre"
+                ? "Pre conference — Pasos 1–6"
+                : stageId === "observation"
+                  ? "Observation — Pasos 1–6"
+                  : "Post conference / reflection — Pasos 1–6"}
+            </h2>
+            <div className="pathway-grid">
+              {PASO_META.map((p) => {
+                const apiSt = getPasoApiStatus(progressData, stageId, p.num);
+                const nav = navFromApiStatus(apiSt);
+                const statusLabel = labelFromApiStatus(apiSt);
+                const cardClass = cardClassFromApiStatus(apiSt);
+                return (
+                  <div
+                    key={p.num}
+                    className={`pathway-card pathway-card--${cardClass} pathway-card--${stTheme} paso-clickable`}
+                    onClick={() => navigateTo(`paso${p.num}`)}
+                  >
+                    <div className={`pathway-card__icon pathway-card__icon--${cardClass}`}>
+                      {nav === "completed" ? "✓" : p.num}
+                    </div>
+                    <span className={`pathway-card__pill pathway-card__pill--${cardClass}`}>
+                      {statusLabel}
+                    </span>
+                    <h3 className="pathway-card__title">
+                      {p.label}: {p.name}
+                    </h3>
+                    <p className="pathway-card__desc">{p.name}</p>
+                    <div className="pathway-card__footer">
+                      <span className="pathway-card__action">
+                        {nav === "completed" ? "Review →" : nav === "draft" ? "Continue →" : "Start →"}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </section>
       );
     }
@@ -1760,13 +2268,60 @@ function TeacherDashboard({ user, onLogout }) {
     const handleChange = (newD) => updatePasoData(num, newD);
     const handleSave = (mode, extra) => handleSavePaso(num, mode, extra);
 
+    const stTheme = STAGE_NAV.find((x) => x.id === activeStage)?.theme || "stage-pre";
+    const stagePasosLabel = STAGE_LABELS[activeStage] || activeStage;
+    const pasoShell = (inner) => (
+      <section className={`dashboard-content dashboard-content--stage ${stTheme}`}>
+        <div className="paso-form-back">
+          <button
+            type="button"
+            className="btn btn--ghost paso-form-back__btn"
+            onClick={() => navigateTo(`stage:${activeStage}`)}
+            aria-label={`Back to ${stagePasosLabel} Pasos overview`}
+          >
+            ← Back to {stagePasosLabel} Pasos
+          </button>
+        </div>
+        {inner}
+      </section>
+    );
     switch (num) {
-      case 1: return <section className="dashboard-content"><Paso1Form data={d} onChange={handleChange} onSave={handleSave} saving={pasoSaving} /></section>;
-      case 2: return <section className="dashboard-content"><Paso2Form cycleId={cycle._id || cycle.id} data={d} onChange={handleChange} onSave={handleSave} saving={pasoSaving} /></section>;
-      case 3: return <section className="dashboard-content"><Paso3Form cycleId={cycle._id || cycle.id} data={d} onChange={handleChange} onSave={handleSave} saving={pasoSaving} /></section>;
-      case 4: return <section className="dashboard-content"><Paso4Form cycleId={cycle._id || cycle.id} data={d} onChange={handleChange} onSave={handleSave} saving={pasoSaving} /></section>;
-      case 5: return <section className="dashboard-content"><Paso5Form data={d} onChange={handleChange} onSave={handleSave} saving={pasoSaving} /></section>;
-      case 6: return <section className="dashboard-content"><Paso6Form data={d} onChange={handleChange} onSave={handleSave} saving={pasoSaving} /></section>;
+      case 1: return pasoShell(<Paso1Form data={d} onChange={handleChange} onSave={handleSave} saving={pasoSaving} stage={activeStage} cycleId={cycle._id || cycle.id} />);
+      case 2: return pasoShell(
+        <Paso2Form
+          cycleId={cycle._id || cycle.id}
+          stage={activeStage}
+          data={d}
+          onChange={handleChange}
+          onSave={handleSave}
+          saving={pasoSaving}
+          onAfterGeneralSave={refreshProgress}
+        />
+      );
+      case 3: return pasoShell(
+        <Paso3Form
+          cycleId={cycle._id || cycle.id}
+          stage={activeStage}
+          data={d}
+          onChange={handleChange}
+          onSave={handleSave}
+          saving={pasoSaving}
+          onAfterGeneralSave={refreshProgress}
+        />
+      );
+      case 4: return pasoShell(
+        <Paso4Form
+          cycleId={cycle._id || cycle.id}
+          stage={activeStage}
+          data={d}
+          onChange={handleChange}
+          onSave={handleSave}
+          saving={pasoSaving}
+          onAfterGeneralSave={refreshProgress}
+        />
+      );
+      case 5: return pasoShell(<Paso5Form data={d} onChange={handleChange} onSave={handleSave} saving={pasoSaving} stage={activeStage} cycleId={cycle._id || cycle.id} />);
+      case 6: return pasoShell(<Paso6Form data={d} onChange={handleChange} onSave={handleSave} saving={pasoSaving} stage={activeStage} cycleId={cycle._id || cycle.id} />);
       default: return null;
     }
   }
@@ -1774,11 +2329,53 @@ function TeacherDashboard({ user, onLogout }) {
   /* ════════════════════════════════════════════════════════════════════ */
 
   return (
-    <div className="dashboard dashboard--teacher">
+    <div className={`dashboard dashboard--teacher dashboard-theme--${themeStage}`}>
       {toast && <Toast msg={toast.msg} type={toast.type} onDone={() => setToast(null)} />}
 
+      {showNewPlanModal && (
+        <div className="lp-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="new-plan-title">
+          <div className="lp-modal">
+            <h2 id="new-plan-title" className="lp-modal__title">New lesson plan</h2>
+            <p className="paso-muted">Choose how to create your plan. Data comes from the coaching stage you select.</p>
+            <label className="lp-modal__label">
+              <span>Coaching stage</span>
+              <select
+                className="auth-input"
+                value={newPlanModalStage}
+                onChange={(e) => setNewPlanModalStage(e.target.value)}
+              >
+                <option value="pre">Pre Conference</option>
+                <option value="observation">Observation</option>
+                <option value="post">Post Conference / Reflection</option>
+              </select>
+            </label>
+            <div className="lp-modal__actions">
+              <button
+                type="button"
+                className="btn btn--ghost"
+                disabled={creatingBlankPlan || generating}
+                onClick={handleBlankPlanFromModal}
+              >
+                {creatingBlankPlan ? "Creating…" : "Blank draft"}
+              </button>
+              <button
+                type="button"
+                className="btn btn--resume"
+                disabled={creatingBlankPlan || generating}
+                onClick={() => handleGenerateWithStage(newPlanModalStage)}
+              >
+                {generating ? "Generating…" : "Generate from current data"}
+              </button>
+            </div>
+            <button type="button" className="lp-modal__close btn btn--ghost" onClick={() => setShowNewPlanModal(false)}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ── Sidebar ──────────────────────────────────────────────────── */}
-      <aside className="dashboard-sidebar">
+      <aside className={`dashboard-sidebar dashboard-sidebar--${themeStage}`}>
         <div className="dashboard-sidebar__brand">
           <div className="dashboard-sidebar__logo">Cc</div>
           <div className="dashboard-sidebar__brand-text">
@@ -1797,24 +2394,23 @@ function TeacherDashboard({ user, onLogout }) {
             <span className="paso-nav-item__label">Dashboard</span>
           </button>
 
-          <ul className="journey-steps">
-            {PASO_META.map((p) => {
-              const status = pasoStatuses[p.num] || "pending";
-              const statusClass = status === "completed" ? "completed" : status === "draft" ? "in_progress" : "locked";
-              const isActive = view === `paso${p.num}`;
+          <ul className="journey-steps journey-steps--stages">
+            {STAGE_NAV.map((s, idx) => {
+              const agg = getStageAggregate(progressData, s.id);
+              const active = view === `stage:${s.id}` || (typeof view === "string" && /^paso\d$/.test(view) && activeStage === s.id);
+              const isCompleted = agg.nav === "completed";
               return (
-                <li
-                  key={p.num}
-                  className={`journey-step journey-step--${statusClass} ${isActive ? "journey-step--active" : ""}`}
-                  onClick={() => navigateTo(`paso${p.num}`)}
-                  style={{ cursor: "pointer" }}
-                >
-                  <span className="journey-step__num">{status === "completed" ? "✓" : p.num}</span>
-                  <div className="journey-step__content">
-                    <span className="journey-step__name">{p.name}</span>
-                    <span className="journey-step__status">
-                      {status === "completed" ? "Completed" : status === "draft" ? "In Progress" : "Not Started"}
-                    </span>
+                <li key={s.id}>
+                  <div
+                    className={`journey-step journey-step--${agg.statusClass} journey-step--${s.theme} ${active ? "journey-step--active" : ""}`}
+                    onClick={() => navigateTo(`stage:${s.id}`)}
+                    style={{ cursor: "pointer" }}
+                  >
+                    <span className="journey-step__num">{isCompleted ? "✓" : idx + 1}</span>
+                    <div className="journey-step__content">
+                      <span className="journey-step__name">{s.label}</span>
+                      <span className="journey-step__status">{agg.displayStatus} · {agg.stagePct}%</span>
+                    </div>
                   </div>
                 </li>
               );
@@ -1833,15 +2429,21 @@ function TeacherDashboard({ user, onLogout }) {
 
           <div className="paso-sidebar-generate">
             <button
+              type="button"
               className="btn btn--resume paso-generate-btn"
-              disabled={!canGenerate || generating}
-              onClick={handleGenerate}
+              disabled={generating || creatingBlankPlan}
+              onClick={() => { setNewPlanModalStage(activeStage); setShowNewPlanModal(true); }}
             >
-              {generating ? "Generating…" : "✨ Generate Lesson Plan"}
+              + New Lesson Plan
             </button>
-            {!canGenerate && (
-              <p className="paso-generate-hint">Complete Pasos 1–5 to enable</p>
-            )}
+            <button
+              type="button"
+              className="btn btn--ghost paso-generate-btn"
+              disabled={generating || creatingBlankPlan}
+              onClick={() => handleGenerateWithStage(activeStage)}
+            >
+              {generating ? "Generating…" : `✨ Quick generate (${STAGE_LABELS[activeStage] || activeStage})`}
+            </button>
           </div>
         </nav>
 
@@ -1861,7 +2463,7 @@ function TeacherDashboard({ user, onLogout }) {
       </aside>
 
       {/* ── Main ─────────────────────────────────────────────────────── */}
-      <main className="dashboard-main">
+      <main className={`dashboard-main dashboard-main--${themeStage}`}>
         <header className="dashboard-header">
           <div className="dashboard-header__breadcrumb">
             <h1 className="dashboard-header__title">{headerTitle()}</h1>

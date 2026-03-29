@@ -3,17 +3,11 @@ const User = require("../models/User");
 const TeacherCycle = require("../models/TeacherCycle");
 const LessonPlan = require("../models/LessonPlan");
 const CoachEvaluation = require("../models/CoachEvaluation");
-const Paso1Submission = require("../models/Paso1Submission");
-const Paso2Submission = require("../models/Paso2Submission");
-const Paso2GeneralSubmission = require("../models/Paso2GeneralSubmission");
-const Paso3Submission = require("../models/Paso3Submission");
-const Paso3GeneralSubmission = require("../models/Paso3GeneralSubmission");
-const Paso4Submission = require("../models/Paso4Submission");
-const Paso4GeneralSubmission = require("../models/Paso4GeneralSubmission");
-const Paso5Submission = require("../models/Paso5Submission");
-const Paso6Submission = require("../models/Paso6Submission");
 const Student = require("../models/Student");
 const { hashPassword } = require("../utils/auth");
+const { fetchStagePasoBundle } = require("../utils/fetchStagePasoBundle");
+
+const STAGES = ["pre", "observation", "post"];
 
 const router = express.Router();
 
@@ -104,22 +98,47 @@ router.get("/cycles/:id", async (req, res) => {
     if (!cycle) return res.status(404).json({ message: "Cycle not found." });
 
     const cid = cycle._id;
-    const [paso1, paso2General, paso3General, paso3, paso4General, paso4, paso5, paso6, students, lessonPlan] = await Promise.all([
-      Paso1Submission.findOne({ teacherCycleId: cid }),
-      Paso2GeneralSubmission.findOne({ teacherCycleId: cid }),
-      Paso3GeneralSubmission.findOne({ teacherCycleId: cid }),
-      Paso3Submission.findOne({ teacherCycleId: cid }),
-      Paso4GeneralSubmission.findOne({ teacherCycleId: cid }),
-      Paso4Submission.findOne({ teacherCycleId: cid }),
-      Paso5Submission.findOne({ teacherCycleId: cid }),
-      Paso6Submission.findOne({ teacherCycleId: cid }),
+    const tid = cycle.teacherId;
+    const pasosByStage = {};
+    for (const st of STAGES) {
+      pasosByStage[st] = await fetchStagePasoBundle(cid, tid, st);
+    }
+    const pre = pasosByStage.pre;
+    const {
+      paso1,
+      paso2General,
+      paso2,
+      paso3General,
+      paso3,
+      paso4General,
+      paso4,
+      paso5,
+      paso6,
+    } = pre;
+    const [students, lessonPlans] = await Promise.all([
       Student.find({ teacherCycleId: cid }),
-      LessonPlan.findOne({ teacherCycleId: cid }),
+      LessonPlan.find({ teacherCycleId: cid }).sort({ updatedAt: -1 }),
     ]);
-    const paso2 = await Paso2Submission.find({ teacherCycleId: cid });
+    const lessonPlan = lessonPlans[0] || null;
     const evaluations = await CoachEvaluation.find({ teacherId: cycle.teacherId });
 
-    res.json({ cycle, paso1, paso2General, paso2, paso3General, paso3, paso4General, paso4, paso5, paso6, students, lessonPlan, evaluations });
+    res.json({
+      cycle,
+      paso1,
+      paso2General,
+      paso2,
+      paso3General,
+      paso3,
+      paso4General,
+      paso4,
+      paso5,
+      paso6,
+      students,
+      lessonPlan,
+      lessonPlans,
+      evaluations,
+      pasosByStage,
+    });
   } catch (err) {
     res.status(500).json({ message: "Internal server error." });
   }

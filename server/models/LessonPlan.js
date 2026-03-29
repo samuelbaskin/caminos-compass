@@ -14,6 +14,12 @@ const lessonPlanSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    stage: {
+      type: String,
+      enum: ["pre", "observation", "post"],
+      default: "pre",
+      index: true,
+    },
     content: { type: String, default: "" },
     paso1to5Input: { type: mongoose.Schema.Types.Mixed, default: {} },
     paso5Id: { type: mongoose.Schema.Types.ObjectId, ref: "Paso5Submission" },
@@ -26,5 +32,7 @@ const lessonPlanSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+lessonPlanSchema.index({ teacherCycleId: 1, teacherId: 1, stage: 1 });
 
 module.exports = mongoose.model("LessonPlan", lessonPlanSchema);

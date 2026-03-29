@@ -39,58 +39,69 @@ export async function getCycle(id) {
   return handleRes(res);
 }
 
-export async function getPaso(cycleId, pasoNum) {
-  const res = await fetch(`${BASE_URL}/api/cycles/${cycleId}/paso/${pasoNum}`, { headers: headers() });
+export async function getCycleProgress(cycleId) {
+  const res = await fetch(`${BASE_URL}/api/cycles/${cycleId}/progress`, { headers: headers() });
   return handleRes(res);
 }
 
-export async function savePaso(cycleId, pasoNum, data) {
-  const res = await fetch(`${BASE_URL}/api/cycles/${cycleId}/paso/${pasoNum}`, {
+function stageQs(stage) {
+  const s = stage && String(stage).trim();
+  if (!s) return "";
+  return `?stage=${encodeURIComponent(s)}`;
+}
+
+export async function getPaso(cycleId, pasoNum, stage = "pre") {
+  const res = await fetch(`${BASE_URL}/api/cycles/${cycleId}/paso/${pasoNum}${stageQs(stage)}`, { headers: headers() });
+  return handleRes(res);
+}
+
+export async function savePaso(cycleId, pasoNum, data, stage = "pre") {
+  const res = await fetch(`${BASE_URL}/api/cycles/${cycleId}/paso/${pasoNum}${stageQs(stage)}`, {
     method: "PUT",
     headers: headers(),
-    body: JSON.stringify(data),
+    body: JSON.stringify({ ...data, stage }),
   });
   return handleRes(res);
 }
 
-export async function getPaso2General(cycleId) {
-  const res = await fetch(`${BASE_URL}/api/cycles/${cycleId}/paso/2/general`, { headers: headers() });
+export async function getPaso2General(cycleId, stage = "pre") {
+  const res = await fetch(`${BASE_URL}/api/cycles/${cycleId}/paso/2/general${stageQs(stage)}`, { headers: headers() });
   return handleRes(res);
 }
 
-export async function savePaso2General(cycleId, data) {
-  const res = await fetch(`${BASE_URL}/api/cycles/${cycleId}/paso/2/general`, {
+export async function savePaso2General(cycleId, data, stage = "pre") {
+  const res = await fetch(`${BASE_URL}/api/cycles/${cycleId}/paso/2/general${stageQs(stage)}`, {
     method: "PUT",
     headers: headers(),
-    body: JSON.stringify(data),
+    body: JSON.stringify({ ...data, stage }),
   });
   return handleRes(res);
 }
 
-export async function getPaso3General(cycleId) {
-  const res = await fetch(`${BASE_URL}/api/cycles/${cycleId}/paso/3/general`, { headers: headers() });
+export async function getPaso3General(cycleId, stage = "pre") {
+  const res = await fetch(`${BASE_URL}/api/cycles/${cycleId}/paso/3/general${stageQs(stage)}`, { headers: headers() });
   return handleRes(res);
 }
 
-export async function savePaso3General(cycleId, data) {
-  const res = await fetch(`${BASE_URL}/api/cycles/${cycleId}/paso/3/general`, {
+export async function savePaso3General(cycleId, data, stage = "pre") {
+  const res = await fetch(`${BASE_URL}/api/cycles/${cycleId}/paso/3/general${stageQs(stage)}`, {
     method: "PUT",
     headers: headers(),
-    body: JSON.stringify(data),
+    body: JSON.stringify({ ...data, stage }),
   });
   return handleRes(res);
 }
 
-export async function getPaso4General(cycleId) {
-  const res = await fetch(`${BASE_URL}/api/cycles/${cycleId}/paso/4/general`, { headers: headers() });
+export async function getPaso4General(cycleId, stage = "pre") {
+  const res = await fetch(`${BASE_URL}/api/cycles/${cycleId}/paso/4/general${stageQs(stage)}`, { headers: headers() });
   return handleRes(res);
 }
 
-export async function savePaso4General(cycleId, data) {
-  const res = await fetch(`${BASE_URL}/api/cycles/${cycleId}/paso/4/general`, {
+export async function savePaso4General(cycleId, data, stage = "pre") {
+  const res = await fetch(`${BASE_URL}/api/cycles/${cycleId}/paso/4/general${stageQs(stage)}`, {
     method: "PUT",
     headers: headers(),
-    body: JSON.stringify(data),
+    body: JSON.stringify({ ...data, stage }),
   });
   return handleRes(res);
 }
@@ -118,17 +129,27 @@ export async function uploadWritingSample(studentId, text) {
   return handleRes(res);
 }
 
-export async function generateLessonPlan(teacherCycleId) {
+export async function generateLessonPlan(teacherCycleId, stage = "pre") {
   const res = await fetch(`${BASE_URL}/api/lesson-plans/generate`, {
     method: "POST",
     headers: headers(),
-    body: JSON.stringify({ teacherCycleId }),
+    body: JSON.stringify({ teacherCycleId, stage }),
   });
   return handleRes(res);
 }
 
-export async function listLessonPlans() {
-  const res = await fetch(`${BASE_URL}/api/lesson-plans`, { headers: headers() });
+export async function createBlankLessonPlan({ teacherCycleId, stage = "pre" }) {
+  const res = await fetch(`${BASE_URL}/api/lesson-plans`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify({ teacherCycleId, stage }),
+  });
+  return handleRes(res);
+}
+
+export async function listLessonPlans(stage) {
+  const q = stage ? `?stage=${encodeURIComponent(stage)}` : "";
+  const res = await fetch(`${BASE_URL}/api/lesson-plans${q}`, { headers: headers() });
   return handleRes(res);
 }
 
@@ -150,6 +171,16 @@ export async function deleteLessonPlan(id) {
   const res = await fetch(`${BASE_URL}/api/lesson-plans/${id}`, {
     method: "DELETE",
     headers: headers(),
+  });
+  return handleRes(res);
+}
+
+/** AI sufficiency review for a single Paso field. */
+export async function reviewPasoResponse(cycleId, body) {
+  const res = await fetch(`${BASE_URL}/api/cycles/${cycleId}/paso-response-review`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify(body),
   });
   return handleRes(res);
 }
