@@ -59,10 +59,132 @@ Provide your evaluation in a clear, structured format.`;
   return response.text;
 }
 
+/**
+ * Score teacher reflection for sufficiency vs rubric. Returns { score, feedback, followUpQuestion }.
+ * Policy: score >= 75 => followUpQuestion null; score < 75 => non-empty followUpQuestion.
+ */
+async function evaluatePasoResponse({ stageLabel, questionLabel, teacherResponse, rubricBlock }) {
+  const client = getAI();
+
+  const rubricText = rubricBlock && rubricBlock.trim()
+    ? rubricBlock.trim()
+    : "(No rubric excerpt found — score leniently: if the answer is on-topic and shows at least two relevant ideas (or synonyms), 75+ is appropriate; length does not matter.)";
+
+  const prompt = `You are a supportive instructional coach evaluating a teacher's written response in the Coaching Caminos framework.
+
+Coaching stage: ${stageLabel}
+
+The teacher was asked:
+"""
+${questionLabel}
+"""
+
+Official rubric reference (comma-separated keywords plus a sample — NOT a minimum length requirement):
+"""
+${rubricText}
+"""
+
+Teacher's response:
+"""
+${teacherResponse}
+"""
+
+Return ONLY valid JSON (no markdown fences) with this exact shape:
+{"score": <integer 0-100>, "feedback": "<1-4 sentences, encouraging and concrete>", "followUpQuestion": <string or null>}
+
+LENIENCY (important):
+- Short, straightforward answers are welcome. Do NOT penalize length or prose style if the answer is on-topic.
+- Primary rule: if the response clearly reflects at least TWO of the rubric keywords OR close synonyms/paraphrases (e.g. "fairness" for equity, "ELs" for English learners, "my background" for positionality), treat it as substantively aligned.
+- If those two concepts appear and the answer addresses the question asked, score 75–100 even in one or two sentences.
+- Reserve scores below 75 for answers that are off-topic, extremely vague ("idk", "yes", single words with no teaching meaning), or missing any clear link to the prompt and keywords.
+- Do not require comprehensive paragraphs, multiple examples, or "coach-level" depth for a passing score.
+
+Thresholds:
+- If score is 75 or higher: set "followUpQuestion" to null. The response is sufficient.
+- If score is below 75: set "followUpQuestion" to ONE short, specific question that helps the teacher deepen their answer (do not repeat the original prompt verbatim).
+- Empty or nearly empty responses (no teaching content) should score 0-35.`;
+
+  const response = await client.models.generateContent({
+    model: "gemini-2.5-flash",
+    contents: prompt,
+  });
+
+  const text = (response.text || "").trim();
+  let parsed;
+  try {
+    const jsonStr = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+    parsed = JSON.parse(jsonStr);
+  } catch {
+    throw new Error("AI returned non-JSON response for Paso review.");
+  }
+
+  let score = Math.min(100, Math.max(0, Math.round(Number(parsed.score) || 0)));
+  let feedback = typeof parsed.feedback === "string" ? parsed.feedback : "Unable to parse feedback.";
+  let followUpQuestion =
+    parsed.followUpQuestion === null || parsed.followUpQuestion === undefined
+      ? null
+      : String(parsed.followUpQuestion).trim() || null;
+
+  if (score >= 75) {
+    followUpQuestion = null;
+  } else {
+    if (!followUpQuestion) {
+      followUpQuestion = "What is one concrete example from your classroom or students that would illustrate your thinking here?";
+    }
+  }
+
+  return { score, feedback, followUpQuestion };
+}
+
+/**
+ * Educational Q&A only. Out-of-scope questions must get a reply containing "Out of Scope".
+ * @param {{ message: string, history?: { role: string, content: string }[] }} opts
+ */
+async function educationalChatReply({ message, history = [] }) {
+  const client = getAI();
+
+  const scopeRules = `You are a helpful assistant for educators using Coaching Caminos.
+
+IN SCOPE (answer helpfully and concisely): teaching and learning, pedagogy, classroom management, lesson planning, curriculum, assessment in schools, multilingual learners / ELL, culturally responsive teaching, differentiation, coaching teachers, professional growth in education, and student development in educational settings.
+
+OUT OF SCOPE: anything not related to education (e.g. general chit-chat, medical/legal/financial advice, politics unrelated to teaching, coding homework unrelated to teaching, recipes, sports scores, personal therapy). For ANY out-of-scope user message, respond with ONE or TWO short sentences that MUST include the exact phrase "Out of Scope" and briefly say you only discuss education-related topics. Do not answer the out-of-scope request.
+
+If the user writes greetings only ("hi"), you may reply briefly in scope as a professional education assistant.
+
+Keep answers concise unless the user asks for detail.`;
+
+  let transcript = "";
+  for (const h of history) {
+    const role = h.role === "user" ? "User" : "Assistant";
+    const text = String(h.content || "").trim();
+    if (!text) continue;
+    transcript += `${role}: ${text}\n`;
+  }
+  transcript += `User: ${String(message).trim()}\nAssistant:`;
+
+  const contents = `${scopeRules}\n\n---\nConversation:\n${transcript}`;
+
+  const response = await client.models.generateContent({
+    model: "gemini-2.5-flash",
+    contents,
+  });
+
+  return (response.text || "").trim() || "Out of Scope: I could not generate a reply. Please ask an education-related question.";
+}
+
+const STAGE_CONTEXT_LABELS = {
+  pre: "Pre Conference",
+  observation: "Observation",
+  post: "Post Conference / Reflection",
+};
+
 function buildLessonPlanPrompt(data) {
-  const { paso1, paso2General, paso2Students, paso3General, paso3, paso4General, paso4, paso5, paso6 } = data;
+  const { stage, paso1, paso2General, paso2Students, paso3General, paso3, paso4General, paso4, paso5, paso6 } = data;
+  const stageLabel = stage ? STAGE_CONTEXT_LABELS[stage] || stage : "Coaching cycle";
 
   return `You are an expert educational consultant specializing in culturally responsive pedagogy for multilingual learners. Based on the following teacher reflection data from the Coaching Caminos 6-Paso framework, generate a comprehensive, actionable lesson plan.
+
+Coaching stage context: ${stageLabel}. Tailor tone and emphasis appropriately for this phase of the coaching cycle (e.g., pre-lesson planning vs. post-lesson reflection). Some fields may be empty — still produce a useful, scaffolded lesson plan using whatever information is provided.
 
 === PASO 1: KNOWLEDGE OF SELF ===
 1. Positionality in relation to content: ${paso1?.q1_positionality?.response || "Not provided"}
@@ -171,4 +293,10 @@ Generate a detailed lesson plan that:
 Format the lesson plan with clear sections: Overview, Objectives, Materials, Procedures (with timing), Differentiation Strategies, Assessment, and Family/Community Connections.`;
 }
 
-module.exports = { generateLessonPlan, evaluateWritingSample };
+module.exports = {
+  generateLessonPlan,
+  evaluateWritingSample,
+  evaluatePasoResponse,
+  educationalChatReply,
+  STAGE_CONTEXT_LABELS,
+};

@@ -21,6 +21,12 @@ const paso4GeneralSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
+    stage: {
+      type: String,
+      enum: ["pre", "observation", "post"],
+      default: "pre",
+      index: true,
+    },
     q1_equitableAccess: responseSchema,
     q2_supportingEnglishLearners: responseSchema,
     q3_homeLanguageSupport: responseSchema,
@@ -36,5 +42,7 @@ const paso4GeneralSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+paso4GeneralSchema.index({ teacherCycleId: 1, teacherId: 1, stage: 1 }, { unique: true });
 
 module.exports = mongoose.model("Paso4GeneralSubmission", paso4GeneralSchema);

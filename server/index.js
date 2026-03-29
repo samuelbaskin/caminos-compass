@@ -11,6 +11,7 @@ const studentRoutes = require("./routes/students");
 const lessonPlanRoutes = require("./routes/lessonPlans");
 const coachRoutes = require("./routes/coach");
 const adminRoutes = require("./routes/admin");
+const chatRoutes = require("./routes/chat");
 const { requireAuth, requireRole } = require("./middleware/auth");
 
 const app = express();
@@ -81,6 +82,9 @@ app.use("/api/auth", authRoutes);
 app.use("/api/cycles", requireAuth, requireRole(["teacher", "admin"]), cycleRoutes);
 app.use("/api/students", requireAuth, requireRole(["teacher", "admin"]), studentRoutes);
 app.use("/api/lesson-plans", requireAuth, requireRole(["teacher", "admin"]), lessonPlanRoutes);
+
+// Educational assistant (teachers, coaches, admins)
+app.use("/api/chat", requireAuth, requireRole(["teacher", "coach", "admin"]), chatRoutes);
 
 // Coach routes
 app.use("/api/coaches", requireAuth, requireRole(["coach", "admin"]), coachRoutes);

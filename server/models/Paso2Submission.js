@@ -13,6 +13,12 @@ const paso2Schema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
+    stage: {
+      type: String,
+      enum: ["pre", "observation", "post"],
+      default: "pre",
+      index: true,
+    },
     studentId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Student",
@@ -32,5 +38,7 @@ const paso2Schema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+paso2Schema.index({ teacherCycleId: 1, teacherId: 1, studentId: 1, stage: 1 }, { unique: true });
 
 module.exports = mongoose.model("Paso2Submission", paso2Schema);

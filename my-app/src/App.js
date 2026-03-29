@@ -4,6 +4,7 @@ import LoginPage from "./LoginPage";
 import TeacherDashboard from "./TeacherDashboard";
 import CoachDashboard from "./CoachDashboard";
 import AdminDashboard from "./AdminDashboard";
+import EducationalChatbot from "./components/EducationalChatbot";
 import { getStoredUser, logout } from "./api/auth";
 
 function HomePage({ user, onLogout }) {
@@ -193,13 +194,28 @@ function App() {
   }
 
   if (user.role === "teacher") {
-    return <TeacherDashboard user={user} onLogout={handleLogout} />;
+    return (
+      <>
+        <TeacherDashboard user={user} onLogout={handleLogout} />
+        <EducationalChatbot />
+      </>
+    );
   }
   if (user.role === "coach") {
-    return <CoachDashboard user={user} onLogout={handleLogout} />;
+    return (
+      <>
+        <CoachDashboard user={user} onLogout={handleLogout} />
+        <EducationalChatbot />
+      </>
+    );
   }
   if (user.role === "admin") {
-    return <AdminDashboard user={user} onLogout={handleLogout} />;
+    return (
+      <>
+        <AdminDashboard user={user} onLogout={handleLogout} />
+        <EducationalChatbot />
+      </>
+    );
   }
 
   return <HomePage user={user} onLogout={handleLogout} />;

@@ -21,6 +21,12 @@ const paso1Schema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
+    stage: {
+      type: String,
+      enum: ["pre", "observation", "post"],
+      default: "pre",
+      index: true,
+    },
     q1_positionality: subQuestionnaireSchema,
     q2_hiddenCurriculum: subQuestionnaireSchema,
     q3_explicitTeaching: subQuestionnaireSchema,
@@ -39,5 +45,7 @@ const paso1Schema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+paso1Schema.index({ teacherCycleId: 1, teacherId: 1, stage: 1 }, { unique: true });
 
 module.exports = mongoose.model("Paso1Submission", paso1Schema);

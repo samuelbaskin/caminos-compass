@@ -13,6 +13,12 @@ const paso5Schema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
+    stage: {
+      type: String,
+      enum: ["pre", "observation", "post"],
+      default: "pre",
+      index: true,
+    },
     q1_partnerConnect: { type: String, default: "" },
     q2_greetStudents: { type: String, default: "" },
     q3_comfortableParticipate: { type: String, default: "" },
@@ -29,5 +35,7 @@ const paso5Schema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+paso5Schema.index({ teacherCycleId: 1, teacherId: 1, stage: 1 }, { unique: true });
 
 module.exports = mongoose.model("Paso5Submission", paso5Schema);
