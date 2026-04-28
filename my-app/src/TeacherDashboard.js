@@ -15,7 +15,6 @@ import {
   createStudent,
   uploadWritingSample,
   generateLessonPlan,
-  createBlankLessonPlan,
   getCycleProgress,
   listLessonPlans,
   getLessonPlan,
@@ -156,14 +155,45 @@ function getStageAggregate(progressData, stageId) {
 
 /* ─── Toast ──────────────────────────────────────────────────────────── */
 
-function Toast({ msg, type, onDone }) {
+function isAiServiceError(msg) {
+  if (!msg || typeof msg !== "string") return false;
+  return /AI service/i.test(msg);
+}
+
+function Toast({ msg, type, onDone, onRetry }) {
+  const hasRetry = typeof onRetry === "function";
   useEffect(() => {
+    if (hasRetry) return undefined;
     const t = setTimeout(onDone, 3500);
     return () => clearTimeout(t);
-  }, [onDone]);
+  }, [onDone, hasRetry]);
   return (
-    <div className={`paso-toast paso-toast--${type}`}>
-      {type === "success" ? "✓" : "⚠"} {msg}
+    <div className={`paso-toast paso-toast--${type}`} role={type === "error" ? "alert" : "status"}>
+      <span className="paso-toast__msg">
+        {type === "success" ? "✓" : "⚠"} {msg}
+      </span>
+      {hasRetry && (
+        <button
+          type="button"
+          className="paso-toast__action"
+          onClick={() => {
+            onRetry();
+            onDone();
+          }}
+        >
+          Retry
+        </button>
+      )}
+      {hasRetry && (
+        <button
+          type="button"
+          className="paso-toast__close"
+          onClick={onDone}
+          aria-label="Dismiss"
+        >
+          ×
+        </button>
+      )}
     </div>
   );
 }
@@ -1448,7 +1478,7 @@ function LessonPlanView({ plan, onRegenerate, generating, onSaveContent, onFinal
       {/* Collapsible input summary */}
       {showInputs && inputs && (
         <div className="lp-inputs">
-          <h3 className="lp-inputs__title">Data Fed to AI (Pasos 1–5)</h3>
+          <h3 className="lp-inputs__title">Data Fed to AI (Pasos 1–6)</h3>
 
           {inputs.paso1 && (
             <div className="lp-inputs__section">
@@ -1714,7 +1744,7 @@ function DashboardHome({
             Lesson plans (this cycle)
           </h2>
           <button type="button" className="btn btn--resume" onClick={onOpenNewPlanModal}>
-            + New Lesson Plan
+            + Generate Lesson Plan
           </button>
         </div>
         {cyclePlans.length === 0 ? (
@@ -1760,26 +1790,21 @@ function DashboardHome({
 
 /* ─── Plans List View ────────────────────────────────────────────────── */
 
-function PlansListView({ plans, onOpen, onNewLessonPlan, onGenerate, generating, onDelete }) {
+function PlansListView({ plans, onOpen, onNewLessonPlan, onDelete }) {
   return (
     <div className="lp-list-view">
       <div className="lp-list-view__header">
         <h2 className="lp-list-view__title">My Lesson Plans</h2>
         <div className="lp-list-view__actions">
           <button type="button" className="btn btn--ghost" onClick={onNewLessonPlan}>
-            + New Lesson Plan
+            + Generate Lesson Plan
           </button>
-          {onGenerate && (
-            <button className="btn btn--resume" disabled={generating} onClick={onGenerate}>
-              {generating ? "Generating…" : "✨ Quick generate (current stage)"}
-            </button>
-          )}
         </div>
       </div>
       {(!plans || plans.length === 0) ? (
         <div className="lp-empty" style={{ marginTop: 32 }}>
           <div className="paso-empty-state__icon">📝</div>
-          <p className="paso-muted">No lesson plans yet. Use New Lesson Plan to add a blank draft or generate with AI.</p>
+          <p className="paso-muted">No lesson plans yet. Use Generate Lesson Plan to add a blank draft or generate with AI.</p>
         </div>
       ) : (
         <div className="lp-list-grid">
@@ -1847,7 +1872,6 @@ function TeacherDashboard({ user, onLogout }) {
   const [totalProgressOpen, setTotalProgressOpen] = useState(false);
   const [showNewPlanModal, setShowNewPlanModal] = useState(false);
   const [newPlanModalStage, setNewPlanModalStage] = useState("pre");
-  const [creatingBlankPlan, setCreatingBlankPlan] = useState(false);
 
   const [lessonPlan, setLessonPlan] = useState(null);
   const [generating, setGenerating] = useState(false);
@@ -1998,29 +2022,14 @@ function TeacherDashboard({ user, onLogout }) {
         setSavedPlans(plansRes.lessonPlans || []);
       } catch { /* silent */ }
     } catch (err) {
-      setToast({ msg: err.message, type: "error" });
+      const aiError = isAiServiceError(err.message);
+      setToast({
+        msg: err.message || "Failed to generate lesson plan.",
+        type: "error",
+        onRetry: aiError ? () => handleGenerateWithStage(stage) : undefined,
+      });
     }
     setGenerating(false);
-  }
-
-  async function handleBlankPlanFromModal() {
-    if (!cycle) return;
-    setCreatingBlankPlan(true);
-    setShowNewPlanModal(false);
-    try {
-      const res = await createBlankLessonPlan({ teacherCycleId: cycle._id || cycle.id, stage: newPlanModalStage });
-      const plan = res.lessonPlan || res;
-      setLessonPlan(plan);
-      setToast({ msg: "Blank draft created.", type: "success" });
-      setView("lessonPlan");
-      try {
-        const plansRes = await listLessonPlans();
-        setSavedPlans(plansRes.lessonPlans || []);
-      } catch { /* silent */ }
-    } catch (err) {
-      setToast({ msg: err.message, type: "error" });
-    }
-    setCreatingBlankPlan(false);
   }
 
   async function handleOpenPlan(planId) {
@@ -2177,8 +2186,6 @@ function TeacherDashboard({ user, onLogout }) {
             plans={savedPlans}
             onOpen={(id) => navigateTo(`plan:${id}`)}
             onNewLessonPlan={() => { setNewPlanModalStage(activeStage); setShowNewPlanModal(true); }}
-            onGenerate={() => handleGenerateWithStage(activeStage)}
-            generating={generating}
             onDelete={handleDeletePlan}
           />
         </section>
@@ -2330,7 +2337,14 @@ function TeacherDashboard({ user, onLogout }) {
 
   return (
     <div className={`dashboard dashboard--teacher dashboard-theme--${themeStage}`}>
-      {toast && <Toast msg={toast.msg} type={toast.type} onDone={() => setToast(null)} />}
+      {toast && (
+        <Toast
+          msg={toast.msg}
+          type={toast.type}
+          onRetry={toast.onRetry}
+          onDone={() => setToast(null)}
+        />
+      )}
 
       {showNewPlanModal && (
         <div className="lp-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="new-plan-title">
@@ -2352,16 +2366,8 @@ function TeacherDashboard({ user, onLogout }) {
             <div className="lp-modal__actions">
               <button
                 type="button"
-                className="btn btn--ghost"
-                disabled={creatingBlankPlan || generating}
-                onClick={handleBlankPlanFromModal}
-              >
-                {creatingBlankPlan ? "Creating…" : "Blank draft"}
-              </button>
-              <button
-                type="button"
                 className="btn btn--resume"
-                disabled={creatingBlankPlan || generating}
+                disabled={generating}
                 onClick={() => handleGenerateWithStage(newPlanModalStage)}
               >
                 {generating ? "Generating…" : "Generate from current data"}
@@ -2431,18 +2437,10 @@ function TeacherDashboard({ user, onLogout }) {
             <button
               type="button"
               className="btn btn--resume paso-generate-btn"
-              disabled={generating || creatingBlankPlan}
+              disabled={generating}
               onClick={() => { setNewPlanModalStage(activeStage); setShowNewPlanModal(true); }}
             >
-              + New Lesson Plan
-            </button>
-            <button
-              type="button"
-              className="btn btn--ghost paso-generate-btn"
-              disabled={generating || creatingBlankPlan}
-              onClick={() => handleGenerateWithStage(activeStage)}
-            >
-              {generating ? "Generating…" : `✨ Quick generate (${STAGE_LABELS[activeStage] || activeStage})`}
+              + Generate Lesson Plan
             </button>
           </div>
         </nav>

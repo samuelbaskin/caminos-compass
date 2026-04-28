@@ -7,6 +7,7 @@ export default function EducationalChatbot() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [pendingRetry, setPendingRetry] = useState(null);
 
   const fabRef = useRef(null);
   const inputRef = useRef(null);
@@ -16,10 +17,25 @@ export default function EducationalChatbot() {
   const close = useCallback(() => {
     setOpen(false);
     setError(null);
+    setPendingRetry(null);
     requestAnimationFrame(() => {
       fabRef.current?.focus();
     });
   }, []);
+
+  async function sendMessage(text, history) {
+    setLoading(true);
+    try {
+      const { reply } = await postEducationalChat({ message: text, history });
+      setMessages((prev) => [...prev, { role: "assistant", content: reply || "" }]);
+      setPendingRetry(null);
+    } catch (err) {
+      setError(err.message || "Something went wrong.");
+      setPendingRetry({ message: text, history });
+    }
+    setLoading(false);
+    requestAnimationFrame(() => inputRef.current?.focus());
+  }
 
   useEffect(() => {
     if (!open) return undefined;
@@ -40,21 +56,17 @@ export default function EducationalChatbot() {
     if (!text || loading) return;
 
     setError(null);
-    const userMsg = { role: "user", content: text };
-    setMessages((prev) => [...prev, userMsg]);
-    setInput("");
-    setLoading(true);
-
+    setPendingRetry(null);
     const history = messages.map((m) => ({ role: m.role, content: m.content }));
-    try {
-      const { reply } = await postEducationalChat({ message: text, history });
-      setMessages((prev) => [...prev, { role: "assistant", content: reply || "" }]);
-    } catch (err) {
-      setError(err.message || "Something went wrong.");
-      setMessages((prev) => prev.slice(0, -1));
-    }
-    setLoading(false);
-    requestAnimationFrame(() => inputRef.current?.focus());
+    setMessages((prev) => [...prev, { role: "user", content: text }]);
+    setInput("");
+    await sendMessage(text, history);
+  }
+
+  async function handleRetry() {
+    if (!pendingRetry || loading) return;
+    setError(null);
+    await sendMessage(pendingRetry.message, pendingRetry.history);
   }
 
   return (
@@ -81,11 +93,12 @@ export default function EducationalChatbot() {
             </button>
           </div>
           <p className="edu-chat__subtitle">
-            Ask about teaching, learning, and classroom practice. Other topics are not supported.
+            Note: This Chat bot operates similar to OpenAI's ChatGPT but is specifically designed to help 
+            educators with their teaching and learning activities.
           </p>
           <div className="edu-chat__messages" role="log" aria-live="polite" aria-relevant="additions">
             {messages.length === 0 && !loading && (
-              <p className="edu-chat__empty">Try: “How can I check for understanding with ELL students?”</p>
+              <p className="edu-chat__empty">Feel free to ask any question about teaching and learning!</p>
             )}
             {messages.map((m, i) => (
               <div
@@ -97,7 +110,21 @@ export default function EducationalChatbot() {
             ))}
             {loading && <div className="edu-chat__bubble edu-chat__bubble--assistant edu-chat__typing">Thinking…</div>}
           </div>
-          {error && <p className="edu-chat__error">{error}</p>}
+          {error && (
+            <div className="edu-chat__error" role="alert">
+              <span>{error}</span>
+              {pendingRetry && (
+                <button
+                  type="button"
+                  className="edu-chat__error-retry"
+                  onClick={handleRetry}
+                  disabled={loading}
+                >
+                  {loading ? "Retrying…" : "Try again"}
+                </button>
+              )}
+            </div>
+          )}
           <form className="edu-chat__form" onSubmit={handleSend}>
             <label htmlFor="edu-chat-input" className="visually-hidden">
               Your question
@@ -131,7 +158,7 @@ export default function EducationalChatbot() {
         <span className="edu-chat__fab-icon" aria-hidden>
           {open ? "✕" : "💬"}
         </span>
-        <span className="edu-chat__fab-label">{open ? "Close" : "Chat Bot"}</span>
+        <span className="edu-chat__fab-label">{open ? "Close" : "Education Assistant"}</span>
       </button>
     </div>
   );

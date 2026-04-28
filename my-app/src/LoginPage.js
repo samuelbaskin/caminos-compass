@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { login, signup } from "./api/auth";
 
 const LOGIN_ROLES = ["teacher", "coach", "admin"];
@@ -103,18 +104,37 @@ function LoginPage({ onLogin }) {
 
   return (
     <div className="auth-page">
-      <header className="auth-topbar">
-        <div className="container auth-topbar__inner">
-          <div className="brand">
+      <header className="site-header auth-header">
+        <div className="container site-header__inner">
+          <Link
+            to="/"
+            className="brand auth-header__brand"
+            aria-label="Back to Coaching Caminos Compass home"
+          >
             <div className="brand__logo">CC</div>
             <div className="brand__text">
-              <span className="brand__title">Coaching Caminos</span>
+              <span className="brand__title">Coaching Caminos Compass</span>
+              <span className="brand__subtitle">
+                Equity-driven educator development
+              </span>
             </div>
-          </div>
+          </Link>
 
-          <div className="auth-topbar__right">
-            <span className="auth-topbar__hint">Teacher Portal Access</span>
-          </div>
+          <nav className="nav-links auth-header__nav" aria-label="Primary">
+            <a className="nav-link" href="/#overview">
+              Overview
+            </a>
+            <a className="nav-link" href="/#vision">
+              Vision
+            </a>
+            <a className="nav-link" href="/#core-framework">
+              Core framework
+            </a>
+            <Link className="nav-link auth-header__back" to="/">
+              <span aria-hidden="true">←</span>
+              <span>Back to home</span>
+            </Link>
+          </nav>
         </div>
       </header>
 

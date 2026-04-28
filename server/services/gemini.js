@@ -1,6 +1,10 @@
 const { GoogleGenAI } = require("@google/genai");
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const PRIMARY_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+const FALLBACK_MODEL = process.env.GEMINI_FALLBACK_MODEL || "gemini-2.0-flash";
+const MAX_ATTEMPTS = Math.max(1, Number(process.env.GEMINI_MAX_ATTEMPTS) || 3);
+const BASE_BACKOFF_MS = Math.max(100, Number(process.env.GEMINI_BACKOFF_MS) || 600);
 
 let ai = null;
 function getAI() {
@@ -13,22 +17,114 @@ function getAI() {
   return ai;
 }
 
-async function generateLessonPlan(paso1to5Data) {
+/**
+ * Best-effort extraction of an HTTP-style status code from a Google GenAI error.
+ * The SDK throws errors that carry the upstream JSON in different shapes
+ * depending on transport, so we look in several places.
+ */
+function getErrorStatus(err) {
+  if (!err) return null;
+  if (typeof err.status === "number") return err.status;
+  if (typeof err.code === "number") return err.code;
+  if (err.error && typeof err.error.code === "number") return err.error.code;
+  const msg = String(err.message || "");
+  const match = msg.match(/\b(429|500|502|503|504)\b/);
+  return match ? Number(match[1]) : null;
+}
+
+function isRetryable(err) {
+  const status = getErrorStatus(err);
+  if (status && [408, 425, 429, 500, 502, 503, 504].includes(status)) return true;
+  const msg = String(err?.message || "").toLowerCase();
+  return (
+    msg.includes("unavailable") ||
+    msg.includes("overloaded") ||
+    msg.includes("high demand") ||
+    msg.includes("temporar") ||
+    msg.includes("timeout") ||
+    msg.includes("econn")
+  );
+}
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Calls Gemini's generateContent with:
+ *   1. exponential backoff + jitter retries on transient errors
+ *   2. one fallback to FALLBACK_MODEL if PRIMARY_MODEL keeps failing
+ *
+ * Surfaces a clean, user-friendly Error on persistent failure so route
+ * handlers don't leak raw upstream JSON to clients.
+ */
+async function callWithRetry({ contents, model, label = "Gemini call" }) {
   const client = getAI();
+  const modelsToTry = model
+    ? [model]
+    : Array.from(new Set([PRIMARY_MODEL, FALLBACK_MODEL].filter(Boolean)));
 
+  let lastErr = null;
+
+  for (let m = 0; m < modelsToTry.length; m += 1) {
+    const currentModel = modelsToTry[m];
+
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
+      try {
+        return await client.models.generateContent({
+          model: currentModel,
+          contents,
+        });
+      } catch (err) {
+        lastErr = err;
+        const status = getErrorStatus(err);
+        const retryable = isRetryable(err);
+        const onLastAttempt = attempt === MAX_ATTEMPTS;
+        const onLastModel = m === modelsToTry.length - 1;
+
+        console.warn(
+          `[gemini] ${label} failed (model=${currentModel}, attempt=${attempt}/${MAX_ATTEMPTS}, status=${status || "n/a"}): ${err?.message || err}`
+        );
+
+        if (!retryable) break;
+
+        if (!onLastAttempt) {
+          const backoff = BASE_BACKOFF_MS * 2 ** (attempt - 1);
+          const jitter = Math.floor(Math.random() * 250);
+          await sleep(backoff + jitter);
+          continue;
+        }
+
+        if (!onLastModel) {
+          console.warn(`[gemini] ${label} switching to fallback model "${modelsToTry[m + 1]}".`);
+        }
+        break;
+      }
+    }
+  }
+
+  const status = getErrorStatus(lastErr);
+  const friendly =
+    status === 429
+      ? "The AI service is rate-limited right now. Please wait a moment and try again."
+      : status && [500, 502, 503, 504].includes(status)
+      ? "The AI service is temporarily unavailable due to high demand. Please try again in a moment."
+      : "The AI service could not complete the request. Please try again.";
+
+  const wrapped = new Error(friendly);
+  wrapped.cause = lastErr;
+  wrapped.status = status || 503;
+  throw wrapped;
+}
+
+async function generateLessonPlan(paso1to5Data) {
   const prompt = buildLessonPlanPrompt(paso1to5Data);
-
-  const response = await client.models.generateContent({
-    model: "gemini-2.5-flash",
+  const response = await callWithRetry({
     contents: prompt,
+    label: "generateLessonPlan",
   });
-
   return response.text;
 }
 
 async function evaluateWritingSample(writingSampleText, studentContext) {
-  const client = getAI();
-
   const prompt = `You are an experienced educational evaluator assisting teachers of multilingual learners.
 
 Student context:
@@ -51,9 +147,9 @@ ${writingSampleText}
 
 Provide your evaluation in a clear, structured format.`;
 
-  const response = await client.models.generateContent({
-    model: "gemini-2.5-flash",
+  const response = await callWithRetry({
     contents: prompt,
+    label: "evaluateWritingSample",
   });
 
   return response.text;
@@ -64,8 +160,6 @@ Provide your evaluation in a clear, structured format.`;
  * Policy: score >= 75 => followUpQuestion null; score < 75 => non-empty followUpQuestion.
  */
 async function evaluatePasoResponse({ stageLabel, questionLabel, teacherResponse, rubricBlock }) {
-  const client = getAI();
-
   const rubricText = rubricBlock && rubricBlock.trim()
     ? rubricBlock.trim()
     : "(No rubric excerpt found — score leniently: if the answer is on-topic and shows at least two relevant ideas (or synonyms), 75+ is appropriate; length does not matter.)";
@@ -104,9 +198,9 @@ Thresholds:
 - If score is below 75: set "followUpQuestion" to ONE short, specific question that helps the teacher deepen their answer (do not repeat the original prompt verbatim).
 - Empty or nearly empty responses (no teaching content) should score 0-35.`;
 
-  const response = await client.models.generateContent({
-    model: "gemini-2.5-flash",
+  const response = await callWithRetry({
     contents: prompt,
+    label: "evaluatePasoResponse",
   });
 
   const text = (response.text || "").trim();
@@ -141,8 +235,6 @@ Thresholds:
  * @param {{ message: string, history?: { role: string, content: string }[] }} opts
  */
 async function educationalChatReply({ message, history = [] }) {
-  const client = getAI();
-
   const scopeRules = `You are a helpful assistant for educators using Coaching Caminos.
 
 IN SCOPE (answer helpfully and concisely): teaching and learning, pedagogy, classroom management, lesson planning, curriculum, assessment in schools, multilingual learners / ELL, culturally responsive teaching, differentiation, coaching teachers, professional growth in education, and student development in educational settings.
@@ -153,8 +245,10 @@ If the user writes greetings only ("hi"), you may reply briefly in scope as a pr
 
 Keep answers concise unless the user asks for detail.`;
 
+  const recentHistory = Array.isArray(history) ? history.slice(-12) : [];
+
   let transcript = "";
-  for (const h of history) {
+  for (const h of recentHistory) {
     const role = h.role === "user" ? "User" : "Assistant";
     const text = String(h.content || "").trim();
     if (!text) continue;
@@ -164,9 +258,9 @@ Keep answers concise unless the user asks for detail.`;
 
   const contents = `${scopeRules}\n\n---\nConversation:\n${transcript}`;
 
-  const response = await client.models.generateContent({
-    model: "gemini-2.5-flash",
+  const response = await callWithRetry({
     contents,
+    label: "educationalChatReply",
   });
 
   return (response.text || "").trim() || "Out of Scope: I could not generate a reply. Please ask an education-related question.";
