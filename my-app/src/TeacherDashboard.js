@@ -24,12 +24,16 @@ import {
 } from "./api/cycles";
 
 const PASO_META = [
-  { num: 1, label: "Paso 1", name: "Knowledge of Self", section: "pre" },
-  { num: 2, label: "Paso 2", name: "Knowledge of Learner/Student Profile", section: "pre" },
-  { num: 3, label: "Paso 3", name: "Practice of Teaching/Preliminary Lesson Plan", section: "pre" },
-  { num: 4, label: "Paso 4", name: "Knowledge of Sociopolitical Dynamics", section: "pre" },
-  { num: 5, label: "Paso 5", name: "Practice of Knowing Learners, Families & Communities", section: "post" },
-  { num: 6, label: "Paso 6", name: "Practice of Advocacy", section: "post" },
+  { num: 1, displayNum: 1, label: "Paso 1", name: "Knowledge of Self", section: "pre" },
+  { num: 2, displayNum: 2, label: "Paso 2", name: "Knowledge of Learner/Student Profile", section: "pre" },
+  // NOTE: `num` is the internal data identifier (matches API routes /paso3, /paso4 and
+  // Paso3*/Paso4*Submission schemas). `displayNum` and `label` are what the user sees.
+  // The two below are intentionally swapped: sociopolitical content (stored under paso4*)
+  // is now displayed as Paso 3, and lesson-plan content (stored under paso3*) as Paso 4.
+  { num: 4, displayNum: 3, label: "Paso 3", name: "Knowledge of Sociopolitical Dynamics", section: "pre" },
+  { num: 3, displayNum: 4, label: "Paso 4", name: "Practice of Teaching/Preliminary Lesson Plan", section: "pre" },
+  { num: 5, displayNum: 5, label: "Paso 5", name: "Practice of Knowing Learners, Families & Communities", section: "post" },
+  { num: 6, displayNum: 6, label: "Paso 6", name: "Practice of Advocacy", section: "post" },
 ];
 
 const STAGE_NAV = [
@@ -714,7 +718,7 @@ function Paso2Form({ cycleId, stage = "pre", data, onChange, onSave, saving, onA
   );
 }
 
-/* ─── Paso 3 : Practice of Teaching/Preliminary Lesson Plan ──────────── */
+/* ─── Paso3Form (displayed as "Paso 4") : Practice of Teaching/Preliminary Lesson Plan ──────────── */
 
 const PASO3_GENERAL_FIELDS = [
   { key: "q1_humanizingPedagogy", label: "1. Humanizing Pedagogy", placeholder: "How does this lesson plan demonstrate the principles of humanizing pedagogy?" },
@@ -777,7 +781,7 @@ function Paso3Form({ cycleId, stage = "pre", data, onChange, onSave, saving, onA
   return (
     <div className="paso-form paso-form--review">
       <div className="paso-form__header">
-        <h2 className="paso-form__title">Paso 3 — Practice of Teaching/Preliminary Lesson Plan</h2>
+        <h2 className="paso-form__title">Paso 4 — Practice of Teaching/Preliminary Lesson Plan</h2>
         <p className="paso-form__desc">
           Complete both sections: general questions about your teaching practice, then your preliminary lesson plan.
         </p>
@@ -888,7 +892,7 @@ function Paso3Form({ cycleId, stage = "pre", data, onChange, onSave, saving, onA
   );
 }
 
-/* ─── Paso 4 : Knowledge of Sociopolitical Dynamics ──────────────────── */
+/* ─── Paso4Form (displayed as "Paso 3") : Knowledge of Sociopolitical Dynamics ──────────────────── */
 
 const PASO4_GENERAL_FIELDS = [
   { key: "q1_equitableAccess", label: "1. Equitable Access to Learning", placeholder: "What factors will influence students' equitable access to learning?" },
@@ -948,7 +952,7 @@ function Paso4Form({ cycleId, stage = "pre", data, onChange, onSave, saving, onA
   return (
     <div className="paso-form paso-form--review">
       <div className="paso-form__header">
-        <h2 className="paso-form__title">Paso 4 — Knowledge of Sociopolitical Dynamics</h2>
+        <h2 className="paso-form__title">Paso 3 — Knowledge of Sociopolitical Dynamics</h2>
         <p className="paso-form__desc">
           Complete both sections: general questions about sociopolitical dynamics, then district guidelines.
         </p>
@@ -1389,11 +1393,11 @@ function LessonPlanView({ plan, onRegenerate, generating, onSaveContent, onFinal
             <span className="lp-stat__label">Paso 2 General</span>
           </div>
           <div className="lp-stat">
-            <span className="lp-stat__num">{inputSummary.paso3GeneralFields.length}/{nPaso3g}</span>
+            <span className="lp-stat__num">{inputSummary.paso4GeneralFields.length}/{nPaso4g}</span>
             <span className="lp-stat__label">Paso 3 General</span>
           </div>
           <div className="lp-stat">
-            <span className="lp-stat__num">{inputSummary.paso4GeneralFields.length}/{nPaso4g}</span>
+            <span className="lp-stat__num">{inputSummary.paso3GeneralFields.length}/{nPaso3g}</span>
             <span className="lp-stat__label">Paso 4 General</span>
           </div>
           <div className="lp-stat">
@@ -1518,31 +1522,9 @@ function LessonPlanView({ plan, onRegenerate, generating, onSaveContent, onFinal
             </div>
           )}
 
-          {inputs.paso3General && (
-            <div className="lp-inputs__section">
-              <h4>Paso 3 — Section 1: General Questions</h4>
-              {lpPaso3GeneralFields.map((f) => {
-                const v = inputs.paso3General[f.key]?.response;
-                if (!v) return null;
-                return <div key={f.key} className="lp-inputs__field"><strong>{f.label}:</strong> {v}</div>;
-              })}
-            </div>
-          )}
-
-          {inputs.paso3 && (
-            <div className="lp-inputs__section">
-              <h4>Paso 3 — Section 2: Preliminary Lesson Plan</h4>
-              {[["lessonTitle", "Title"], ["gradeLevel", "Grade"], ["subjectArea", "Subject"], ["lessonObjectives", "Objectives"]].map(([k, l]) => {
-                const v = inputs.paso3[k];
-                if (!v) return null;
-                return <div key={k} className="lp-inputs__field"><strong>{l}:</strong> {v}</div>;
-              })}
-            </div>
-          )}
-
           {inputs.paso4General && (
             <div className="lp-inputs__section">
-              <h4>Paso 4 — Section 1: General Questions</h4>
+              <h4>Paso 3 — Section 1: General Questions</h4>
               {lpPaso4GeneralFields.map((f) => {
                 const v = inputs.paso4General[f.key]?.response;
                 if (!v) return null;
@@ -1553,9 +1535,31 @@ function LessonPlanView({ plan, onRegenerate, generating, onSaveContent, onFinal
 
           {inputs.paso4 && (
             <div className="lp-inputs__section">
-              <h4>Paso 4 — Section 2: State Guidelines</h4>
+              <h4>Paso 3 — Section 2: State Guidelines</h4>
               {[["districtStandards", "Standards"], ["curriculumRequirements", "Curriculum"], ["assessmentGuidelines", "Assessment"], ["accommodationPolicies", "Accommodations"]].map(([k, l]) => {
                 const v = inputs.paso4[k];
+                if (!v) return null;
+                return <div key={k} className="lp-inputs__field"><strong>{l}:</strong> {v}</div>;
+              })}
+            </div>
+          )}
+
+          {inputs.paso3General && (
+            <div className="lp-inputs__section">
+              <h4>Paso 4 — Section 1: General Questions</h4>
+              {lpPaso3GeneralFields.map((f) => {
+                const v = inputs.paso3General[f.key]?.response;
+                if (!v) return null;
+                return <div key={f.key} className="lp-inputs__field"><strong>{f.label}:</strong> {v}</div>;
+              })}
+            </div>
+          )}
+
+          {inputs.paso3 && (
+            <div className="lp-inputs__section">
+              <h4>Paso 4 — Section 2: Preliminary Lesson Plan</h4>
+              {[["lessonTitle", "Title"], ["gradeLevel", "Grade"], ["subjectArea", "Subject"], ["lessonObjectives", "Objectives"]].map(([k, l]) => {
+                const v = inputs.paso3[k];
                 if (!v) return null;
                 return <div key={k} className="lp-inputs__field"><strong>{l}:</strong> {v}</div>;
               })}
@@ -2235,7 +2239,7 @@ function TeacherDashboard({ user, onLogout }) {
                     onClick={() => navigateTo(`paso${p.num}`)}
                   >
                     <div className={`pathway-card__icon pathway-card__icon--${cardClass}`}>
-                      {nav === "completed" ? "✓" : p.num}
+                      {nav === "completed" ? "✓" : (p.displayNum ?? p.num)}
                     </div>
                     <span className={`pathway-card__pill pathway-card__pill--${cardClass}`}>
                       {statusLabel}

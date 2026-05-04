@@ -32,14 +32,20 @@ const userSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Never include passwordHash in JSON responses
+// Never include passwordHash in JSON responses.
+// `_id` is included alongside `id` so admin/coach UIs that key off either
+// shape keep working; `createdAt` / `updatedAt` are surfaced so the
+// admin "Created" column has data to render.
 userSchema.methods.toPublic = function () {
   return {
     id: this._id.toString(),
+    _id: this._id.toString(),
     firstName: this.firstName,
     lastName: this.lastName,
     email: this.email,
     role: this.role,
+    createdAt: this.createdAt,
+    updatedAt: this.updatedAt,
   };
 };
 

@@ -203,17 +203,18 @@ function LandingPage() {
                 value families&apos; knowledge, languages, and long-term
                 aspirations.
               </li>
-              <li>
-                <strong>Practice of Advocacy</strong> — Taking critical action
-                toward addressing systemic issues within the classroom and
-                beyond to create inclusive bilingual learning environments that
-                are culturally sustaining and promote social justice for all.
-              </li>
+              
               <li>
                 <strong>Knowledge of Self</strong> — Ongoing critical
                 reflection on one&apos;s positionality to understand historical
                 and ongoing systems of oppression and to identify and mitigate
                 implicit biases and practices in one&apos;s own thinking.
+              </li>
+              <li>
+                <strong>Practice of Advocacy</strong> — Taking critical action
+                toward addressing systemic issues within the classroom and
+                beyond to create inclusive bilingual learning environments that
+                are culturally sustaining and promote social justice for all.
               </li>
             </ol>
           </div>

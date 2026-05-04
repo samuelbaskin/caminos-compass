@@ -1108,7 +1108,7 @@ body{
   outline:2px solid var(--accent);
 }
 .dashboard-progress__bar--total .dashboard-progress__fill--total{
-  background:linear-gradient(90deg, #22c55e, #f97316, #3b82f6);
+  background:linear-gradient(90deg, #4ade80, #38bdf8, #a78bfa);
 }
 .dashboard-progress__bar--stage,
 .dashboard-progress__bar--paso,
@@ -1116,9 +1116,9 @@ body{
   height:8px;
   margin-top:4px;
 }
-.dashboard-progress__fill--stage-pre{ background:#22c55e; }
-.dashboard-progress__fill--stage-observation{ background:#f97316; }
-.dashboard-progress__fill--stage-post{ background:#3b82f6; }
+.dashboard-progress__fill--stage-pre{ background:#4ade80; }
+.dashboard-progress__fill--stage-observation{ background:#38bdf8; }
+.dashboard-progress__fill--stage-post{ background:#a78bfa; }
 
 .progress-hierarchy{
   margin:16px 0 24px;
@@ -1201,28 +1201,190 @@ body{
   margin-bottom:12px;
 }
 
-/* Stage theme accents (teacher dashboard) */
-.dashboard-theme--stage-pre .dashboard-header__title{ color:#15803d; }
-.dashboard-theme--stage-observation .dashboard-header__title{ color:#c2410c; }
-.dashboard-theme--stage-post .dashboard-header__title{ color:#1d4ed8; }
+/* ═══════════════════════════════════════════════════════════════════════
+   STAGE THEMING (Pre-Conference / Observation / Post-Conference)
+   - Pre-Conference  → Light Green
+   - Observation     → Sky Blue
+   - Post-Conference → Light Purple
+   ═══════════════════════════════════════════════════════════════════════ */
 
-.dashboard-sidebar--stage-pre .journey-step--active{
-  box-shadow:inset 3px 0 0 #22c55e;
+/* Per-phase palette tokens. Any element that lives inside a `--stage-pre`,
+   `--stage-observation`, or `--stage-post` themed container can pick up the
+   right colors via these CSS custom properties. */
+.dashboard-theme--stage-pre,
+.journey-step--stage-pre,
+.pathway-card--stage-pre,
+.dashboard-content--stage.stage-pre{
+  --phase-bg:        #f0fdf4;  /* very light tint for surfaces        */
+  --phase-soft:      #dcfce7;  /* hover / pill background             */
+  --phase-border:    #86efac;  /* card borders                        */
+  --phase-accent:    #22c55e;  /* primary saturated accent            */
+  --phase-strong:    #15803d;  /* darker text/headings                */
+  --phase-shadow:    rgba(34, 197, 94, .25);
 }
-.dashboard-sidebar--stage-observation .journey-step--active{
-  box-shadow:inset 3px 0 0 #f97316;
+.dashboard-theme--stage-observation,
+.journey-step--stage-observation,
+.pathway-card--stage-observation,
+.dashboard-content--stage.stage-observation{
+  --phase-bg:        #f0f9ff;
+  --phase-soft:      #e0f2fe;
+  --phase-border:    #7dd3fc;
+  --phase-accent:    #38bdf8;
+  --phase-strong:    #0369a1;
+  --phase-shadow:    rgba(56, 189, 248, .28);
 }
-.dashboard-sidebar--stage-post .journey-step--active{
-  box-shadow:inset 3px 0 0 #3b82f6;
+.dashboard-theme--stage-post,
+.journey-step--stage-post,
+.pathway-card--stage-post,
+.dashboard-content--stage.stage-post{
+  --phase-bg:        #faf5ff;
+  --phase-soft:      #ede9fe;
+  --phase-border:    #c4b5fd;
+  --phase-accent:    #a78bfa;
+  --phase-strong:    #6d28d9;
+  --phase-shadow:    rgba(167, 139, 250, .30);
 }
 
-.pathway-card--stage-pre{ border-top:3px solid #22c55e; }
-.pathway-card--stage-observation{ border-top:3px solid #f97316; }
-.pathway-card--stage-post{ border-top:3px solid #3b82f6; }
+/* Header title color when the dashboard is showing a particular stage */
+.dashboard-theme--stage-pre .dashboard-header__title,
+.dashboard-theme--stage-observation .dashboard-header__title,
+.dashboard-theme--stage-post .dashboard-header__title{
+  color:var(--phase-strong);
+}
 
-.journey-step--stage-pre.journey-step--active{ border-color:#22c55e; }
-.journey-step--stage-observation.journey-step--active{ border-color:#f97316; }
-.journey-step--stage-post.journey-step--active{ border-color:#3b82f6; }
+/* ─── Sidebar journey-step cards (left-hand nav, one per phase) ──────── */
+
+.journey-step{
+  position:relative;
+  padding:12px 16px 12px 22px;
+  margin:6px 12px;
+  border-radius:12px;
+  background:var(--phase-bg, var(--panel-subtle));
+  border:1px solid var(--phase-border, var(--border));
+  box-shadow:0 1px 2px rgba(15, 23, 42, .04);
+  transition:transform .18s ease, box-shadow .18s ease, background-color .18s ease;
+}
+
+/* The colored "tab" running down the left side of each phase card */
+.journey-step::before{
+  content:"";
+  position:absolute;
+  top:10px;
+  bottom:10px;
+  left:6px;
+  width:4px;
+  border-radius:4px;
+  background:var(--phase-accent, var(--accent));
+}
+
+.journey-step:hover{
+  transform:translateY(-1px);
+  background:var(--phase-soft, var(--accent-light));
+  box-shadow:0 6px 18px var(--phase-shadow, rgba(15, 23, 42, .08));
+}
+
+.journey-step--active{
+  background:var(--phase-soft) !important;
+  color:var(--phase-strong) !important;
+  border-color:var(--phase-accent);
+  box-shadow:0 6px 22px var(--phase-shadow);
+}
+
+.journey-step--active::before{
+  width:5px;
+  background:var(--phase-strong);
+}
+
+.journey-step--active .journey-step__name{
+  color:var(--phase-strong);
+}
+
+.journey-step--active .journey-step__status{
+  color:var(--phase-strong);
+  opacity:.85;
+}
+
+/* Numeric circle / check-mark on each card */
+.journey-step__num{
+  background:var(--phase-accent, #e2e8f0);
+  color:#fff;
+  box-shadow:0 1px 2px rgba(15, 23, 42, .15);
+}
+.journey-step--active .journey-step__num{
+  background:var(--phase-strong);
+  color:#fff;
+}
+/* Completed state from the existing variant overrides phase color with the
+   global accent, which is intentional (green ✓ = "done"). */
+
+/* ─── Pathway cards in main content area (one per Paso, in current stage) */
+
+.pathway-card{
+  border-top:4px solid var(--phase-accent, var(--accent));
+  border-color:var(--phase-border, var(--border));
+  transition:transform .18s ease, box-shadow .18s ease;
+}
+
+.pathway-card:hover{
+  transform:translateY(-2px);
+  box-shadow:0 12px 28px var(--phase-shadow, rgba(15, 23, 42, .10));
+  border-color:var(--phase-accent);
+}
+
+/* Status-variant rules (--in_progress, --completed, --locked) for icon, pill,
+   border, and action link are themed via --phase-* variables in their primary
+   declarations later in the stylesheet. */
+
+/* Subtle phase-colored top accent on the main content area when the user is
+   inside a particular stage view. */
+.dashboard-content--stage{
+  box-shadow:inset 0 3px 0 var(--phase-accent);
+}
+
+/* ─── Inside a paso form, theme the focusable controls so each question card
+   reads with the same color identity as its phase ─────────────────────── */
+
+/* Inputs / textareas: phase-colored focus ring */
+.dashboard-content--stage .auth-input:focus-visible,
+.dashboard-content--stage .paso-textarea:focus-visible{
+  border-color:var(--phase-accent);
+  box-shadow:0 0 0 3px var(--phase-shadow);
+  background:#ffffff;
+}
+
+/* "← Back to … Pasos" button: phase-tinted hover + focus */
+.dashboard-content--stage .paso-form-back__btn:hover{
+  border-color:var(--phase-accent);
+  color:var(--phase-strong);
+  background:var(--phase-soft);
+  box-shadow:none;
+}
+.dashboard-content--stage .paso-form-back__btn:focus-visible{
+  outline:2px solid var(--phase-accent);
+  outline-offset:2px;
+}
+
+/* Subtle phase-colored left accent on each review row, and themed pane
+   border so feedback panes share the phase identity. */
+.dashboard-content--stage .paso-review-row{
+  position:relative;
+  padding-left:14px;
+}
+.dashboard-content--stage .paso-review-row::before{
+  content:"";
+  position:absolute;
+  left:0;
+  top:6px;
+  bottom:6px;
+  width:3px;
+  border-radius:3px;
+  background:var(--phase-accent);
+  opacity:.55;
+}
+.dashboard-content--stage .paso-review-row__pane{
+  border-color:var(--phase-border);
+  background:var(--phase-bg);
+}
 
 .lp-badge--stage{
   background:#2d3748;
@@ -1328,13 +1490,14 @@ body{
 }
 
 .pathway-card--in_progress{
-  border-color:var(--accent);
-  background:var(--panel-subtle);
+  border-color:var(--phase-accent, var(--accent));
+  background:var(--phase-bg, var(--panel-subtle));
 }
 
 .pathway-card--locked{
-  background:#f8fafc;
+  background:#fafafa;
   border-color:#e2e8f0;
+  opacity:.92;
 }
 
 .pathway-card__icon{
@@ -1348,18 +1511,20 @@ body{
 }
 
 .pathway-card__icon--completed{
-  background:var(--accent-light);
-  color:var(--accent-hover);
+  background:var(--phase-soft, var(--accent-light));
+  color:var(--phase-strong, var(--accent-hover));
 }
 
 .pathway-card__icon--in_progress{
-  background:var(--accent);
+  background:var(--phase-accent, var(--accent));
   color:#fff;
+  box-shadow:0 2px 8px var(--phase-shadow, rgba(15, 23, 42, .15));
 }
 
 .pathway-card__icon--locked{
-  background:#e2e8f0;
-  color:var(--muted);
+  background:var(--phase-soft, #e2e8f0);
+  color:var(--phase-strong, var(--muted));
+  opacity:.55;
 }
 
 .pathway-card__pill{
@@ -1373,18 +1538,19 @@ body{
 }
 
 .pathway-card__pill--completed{
-  background:var(--accent-light);
-  color:var(--accent-hover);
+  background:var(--phase-soft, var(--accent-light));
+  color:var(--phase-strong, var(--accent-hover));
 }
 
 .pathway-card__pill--in_progress{
-  background:var(--accent);
+  background:var(--phase-accent, var(--accent));
   color:#fff;
 }
 
 .pathway-card__pill--locked{
-  background:#e2e8f0;
-  color:var(--muted);
+  background:var(--phase-soft, #e2e8f0);
+  color:var(--phase-strong, var(--muted));
+  opacity:.7;
 }
 
 .pathway-card__title{
@@ -1411,7 +1577,7 @@ body{
 }
 
 .pathway-card__action{
-  color:var(--accent-hover);
+  color:var(--phase-strong, var(--accent-hover));
   font-weight:600;
   text-decoration:none;
 }
@@ -2060,18 +2226,18 @@ body{
 }
 
 .paso-review-row__submit--primary{
-  background:#7dd3fc !important;
-  color:#0c4a6e !important;
-  border:1px solid #38bdf8 !important;
+  background:var(--phase-soft, #7dd3fc) !important;
+  color:var(--phase-strong, #0c4a6e) !important;
+  border:1px solid var(--phase-accent, #38bdf8) !important;
 }
 
 .paso-review-row__submit--primary:hover:not(:disabled){
-  background:#38bdf8 !important;
-  color:#0f172a !important;
+  background:var(--phase-accent, #38bdf8) !important;
+  color:#fff !important;
 }
 
 .paso-review-row__submit--primary:focus-visible{
-  outline:2px solid #0284c7;
+  outline:2px solid var(--phase-strong, #0284c7);
   outline-offset:2px;
 }
 
@@ -2355,7 +2521,7 @@ body{
   margin:0 0 10px;
   font-size:1.05rem;
   font-weight:700;
-  color:var(--accent-hover);
+  color:var(--phase-strong, var(--accent-hover));
 }
 
 .paso-form__section-header .paso-form__section-title{
@@ -2920,14 +3086,8 @@ body{
   box-shadow:0 8px 24px rgba(56,193,114,.15);
 }
 
-.journey-step--active{
-  background:var(--accent-light) !important;
-  color:var(--accent-hover) !important;
-}
-
-.journey-step--active .journey-step__status{
-  color:var(--accent-hover);
-}
+/* Active-state colors are defined per-phase in the stage theming block above
+   (`.journey-step--active` with `--phase-soft` / `--phase-strong`). */
 
 /* ── Lesson Plan Cards (Dashboard Home) ───────────────────────────────── */
 

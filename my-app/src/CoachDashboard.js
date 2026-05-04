@@ -449,34 +449,6 @@ function StagePasoBundleReadOnly({ phaseTitle, bundle, caption }) {
         Paso 3 — Section 1: General Questions
       </h4>
       <div style={{ fontSize: ".8rem", color: "var(--muted)", marginBottom: 10 }}>
-        {paso3General ? <>{statusPill(paso3General.status)} <span style={{ marginLeft: 6 }}>Updated {paso3General.updatedAt ? new Date(paso3General.updatedAt).toLocaleDateString() : ""}</span></> : "Not submitted"}
-      </div>
-      {paso3General ? (
-        PASO3_GENERAL_FIELDS.map((f) => (
-          <DataField key={f.key} label={f.label} value={paso3General[f.key]?.response} />
-        ))
-      ) : (
-        <p style={{ color: "var(--muted)", fontStyle: "italic" }}>No general questions data.</p>
-      )}
-
-      <h4 style={{ margin: "20px 0 8px", fontSize: ".95rem", fontWeight: 700, color: "var(--text)" }}>
-        Paso 3 — Section 2: Preliminary Lesson Plan
-      </h4>
-      <div style={{ fontSize: ".8rem", color: "var(--muted)", marginBottom: 10 }}>
-        {paso3 ? <>{statusPill(paso3.status)} <span style={{ marginLeft: 6 }}>Updated {paso3.updatedAt ? new Date(paso3.updatedAt).toLocaleDateString() : ""}</span></> : "Not submitted"}
-      </div>
-      {paso3 ? (
-        PASO3_FIELDS.map((f) => (
-          <DataField key={f.key} label={f.label} value={paso3[f.key]} />
-        ))
-      ) : (
-        <p style={{ color: "var(--muted)", fontStyle: "italic" }}>No preliminary plan data.</p>
-      )}
-
-      <h4 style={{ margin: "20px 0 8px", fontSize: ".95rem", fontWeight: 700, color: "var(--text)" }}>
-        Paso 4 — Section 1: General Questions
-      </h4>
-      <div style={{ fontSize: ".8rem", color: "var(--muted)", marginBottom: 10 }}>
         {paso4General ? <>{statusPill(paso4General.status)} <span style={{ marginLeft: 6 }}>Updated {paso4General.updatedAt ? new Date(paso4General.updatedAt).toLocaleDateString() : ""}</span></> : "Not submitted"}
       </div>
       {paso4General ? (
@@ -488,7 +460,7 @@ function StagePasoBundleReadOnly({ phaseTitle, bundle, caption }) {
       )}
 
       <h4 style={{ margin: "20px 0 8px", fontSize: ".95rem", fontWeight: 700, color: "var(--text)" }}>
-        Paso 4 — Section 2: District Guidelines
+        Paso 3 — Section 2: District Guidelines
       </h4>
       <div style={{ fontSize: ".8rem", color: "var(--muted)", marginBottom: 10 }}>
         {paso4 ? <>{statusPill(paso4.status)} <span style={{ marginLeft: 6 }}>Updated {paso4.updatedAt ? new Date(paso4.updatedAt).toLocaleDateString() : ""}</span></> : "Not submitted"}
@@ -499,6 +471,34 @@ function StagePasoBundleReadOnly({ phaseTitle, bundle, caption }) {
         ))
       ) : (
         <p style={{ color: "var(--muted)", fontStyle: "italic" }}>No district guidelines data.</p>
+      )}
+
+      <h4 style={{ margin: "20px 0 8px", fontSize: ".95rem", fontWeight: 700, color: "var(--text)" }}>
+        Paso 4 — Section 1: General Questions
+      </h4>
+      <div style={{ fontSize: ".8rem", color: "var(--muted)", marginBottom: 10 }}>
+        {paso3General ? <>{statusPill(paso3General.status)} <span style={{ marginLeft: 6 }}>Updated {paso3General.updatedAt ? new Date(paso3General.updatedAt).toLocaleDateString() : ""}</span></> : "Not submitted"}
+      </div>
+      {paso3General ? (
+        PASO3_GENERAL_FIELDS.map((f) => (
+          <DataField key={f.key} label={f.label} value={paso3General[f.key]?.response} />
+        ))
+      ) : (
+        <p style={{ color: "var(--muted)", fontStyle: "italic" }}>No general questions data.</p>
+      )}
+
+      <h4 style={{ margin: "20px 0 8px", fontSize: ".95rem", fontWeight: 700, color: "var(--text)" }}>
+        Paso 4 — Section 2: Preliminary Lesson Plan
+      </h4>
+      <div style={{ fontSize: ".8rem", color: "var(--muted)", marginBottom: 10 }}>
+        {paso3 ? <>{statusPill(paso3.status)} <span style={{ marginLeft: 6 }}>Updated {paso3.updatedAt ? new Date(paso3.updatedAt).toLocaleDateString() : ""}</span></> : "Not submitted"}
+      </div>
+      {paso3 ? (
+        PASO3_FIELDS.map((f) => (
+          <DataField key={f.key} label={f.label} value={paso3[f.key]} />
+        ))
+      ) : (
+        <p style={{ color: "var(--muted)", fontStyle: "italic" }}>No preliminary plan data.</p>
       )}
 
       <h4 style={{ margin: "20px 0 8px", fontSize: ".95rem", fontWeight: 700, color: "var(--text)" }}>

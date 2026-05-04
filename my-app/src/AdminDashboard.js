@@ -26,11 +26,15 @@ const EMPTY_USER_FORM = {
   role: "teacher",
 };
 
+// NOTE: object keys are the internal data identifiers (paso3 = lesson plan content,
+// paso4 = sociopolitical content). The user-visible numbers are intentionally
+// flipped: sociopolitical is shown as Paso 3, lesson plan as Paso 4.
+// Insertion order also drives the order in the Paso Statuses grid below.
 const PASO_LABELS = {
   paso1: "Paso 1 — Knowledge of Self",
   paso2: "Paso 2 — Knowledge of Learner/Student Profile",
-  paso3: "Paso 3 — Practice of Teaching/Preliminary Lesson Plan",
-  paso4: "Paso 4 — Knowledge of Sociopolitical Dynamics",
+  paso4: "Paso 3 — Knowledge of Sociopolitical Dynamics",
+  paso3: "Paso 4 — Practice of Teaching/Preliminary Lesson Plan",
   paso5: "Paso 5 — Practice of Knowing Learners, Families & Communities",
   paso6: "Paso 6 — Practice of Advocacy",
 };
@@ -325,6 +329,19 @@ function UsersView() {
     catch (e) { alert(e.message); setConfirmDelete(null); }
   }
 
+  // Role-aware confirmation copy so the admin understands the cascade scope
+  // before they click Delete a second time.
+  function buildDeleteMessage(u) {
+    const name = `"${u.firstName} ${u.lastName}"`;
+    if (u.role === "teacher") {
+      return `Delete ${name}? This will also permanently remove every coaching cycle, student, Paso submission, lesson plan, and coach evaluation tied to this teacher. This cannot be undone.`;
+    }
+    if (u.role === "coach") {
+      return `Delete ${name}? This will also permanently remove every coach evaluation this coach has written. This cannot be undone.`;
+    }
+    return `Delete admin account ${name}? This cannot be undone.`;
+  }
+
   const filtered = users.filter((u) => {
     if (!search) return true;
     const s = search.toLowerCase();
@@ -366,7 +383,7 @@ function UsersView() {
         </table>
       </div>
       {modal && <UserFormModal initial={modal === "create" ? null : modal} onSave={handleSave} onClose={() => setModal(null)} saving={saving} />}
-      {confirmDelete && <ConfirmDialog message={`Delete "${confirmDelete.firstName} ${confirmDelete.lastName}"? This cannot be undone.`} onConfirm={handleDelete} onCancel={() => setConfirmDelete(null)} />}
+      {confirmDelete && <ConfirmDialog message={buildDeleteMessage(confirmDelete)} onConfirm={handleDelete} onCancel={() => setConfirmDelete(null)} />}
     </div>
   );
 }
