@@ -177,6 +177,12 @@ function LandingPage() {
             </p>
             <ol className="landing-framework-list">
               <li>
+                <strong>Knowledge of Self</strong> — Ongoing critical
+                reflection on one&apos;s positionality to understand historical
+                and ongoing systems of oppression and to identify and mitigate
+                implicit biases and practices in one&apos;s own thinking.
+              </li>
+              <li>
                 <strong>Knowledge of the Learner</strong> — Commitment to
                 developing deep factual and experiential understanding of each
                 learner through holistic learning profiles.
@@ -202,13 +208,6 @@ function LandingPage() {
                 — Creation of culturally sustaining learning communities that
                 value families&apos; knowledge, languages, and long-term
                 aspirations.
-              </li>
-              
-              <li>
-                <strong>Knowledge of Self</strong> — Ongoing critical
-                reflection on one&apos;s positionality to understand historical
-                and ongoing systems of oppression and to identify and mitigate
-                implicit biases and practices in one&apos;s own thinking.
               </li>
               <li>
                 <strong>Practice of Advocacy</strong> — Taking critical action
